@@ -1,9 +1,9 @@
 // =============================================
 // 1. CONFIGURACIÓN DE SUPABASE
 // =============================================
-const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co';  // Tu URL
+const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co/rest/v1/';  // Tu URL
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aHR2amtqbmZ0aWp6YXp0enFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjIyMzMsImV4cCI6MjEwMDIzODIzM30.HQGkaabDSjUiK-9JxczPY7R72zr8nEdTK32Pk6PMkDM';  // Tu clave anon public
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 let currentUser = null;      // Usuario autenticado
 let currentCharacter = null; // Personaje actual del gacha
@@ -26,7 +26,7 @@ const messageP = document.getElementById('message');
 async function loginDemoUser() {
     // En una app real, usarías supabase.auth.signInWithPassword()
     // Para pruebas, usamos un usuario fijo que ya existe en profiles
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('profiles')
         .select('*')
         .eq('username', 'demo_user')  // Asegúrate de que exista
@@ -62,7 +62,7 @@ async function rwCommand() {
 
     try {
         // Obtener personaje aleatorio de la tabla 'characters'
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('characters')
             .select('*')
             .order('random()')
@@ -108,7 +108,7 @@ async function claimCommand() {
 
     try {
         // 1. Verificar si ya tiene el personaje
-        const { data: existing, error: checkError } = await supabase
+        const { data: existing, error: checkError } = await supabaseClient
             .from('inventory')
             .select('id')
             .eq('user_id', currentUser.id)
@@ -123,7 +123,7 @@ async function claimCommand() {
         }
 
         // 2. Añadir al inventario
-        const { error: insertError } = await supabase
+        const { error: insertError } = await supabaseClient
             .from('inventory')
             .insert({
                 user_id: currentUser.id,
@@ -134,7 +134,7 @@ async function claimCommand() {
 
         // 3. Actualizar monedas del usuario
         const newCoins = (currentUser.coins || 0) + (currentCharacter.value || 0);
-        const { error: updateError } = await supabase
+        const { error: updateError } = await supabaseClient
             .from('profiles')
             .update({ coins: newCoins })
             .eq('id', currentUser.id);
@@ -164,7 +164,7 @@ async function claimCommand() {
 
 // Verificar si el usuario puede usar rw o claim
 async function checkCooldown(tipo) {
-    const { data, error } = await supabase
+    const { data, error } = await supabaseClient
         .from('cooldowns')
         .select('last_rw, last_claim')
         .eq('user_id', currentUser.id)
@@ -172,7 +172,7 @@ async function checkCooldown(tipo) {
 
     if (error) {
         // Si no existe registro, crear uno nuevo
-        await supabase
+        await supabaseClient
             .from('cooldowns')
             .insert({ user_id: currentUser.id });
         return true;
@@ -203,7 +203,7 @@ async function updateCooldown(tipo) {
         updateData.last_claim = new Date().toISOString();
     }
 
-    const { error } = await supabase
+    const { error } = await supabaseClient
         .from('cooldowns')
         .upsert(updateData);
 
