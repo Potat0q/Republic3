@@ -3,7 +3,7 @@
 // =============================================
 const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aHR2amtqbmZ0aWp6YXp0enFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjIyMzMsImV4cCI6MjEwMDIzODIzM30.HQGkaabDSjUiK-9JxczPY7R72zr8nEdTK32Pk6PMkDM';
-const supabase = window.supabase.createClient(supabaseUrl, supabaseKey);
+const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
 // =============================================
 // 2. USUARIO DE PRUEBA (SIN AUTENTICACIÓN)
@@ -37,7 +37,7 @@ const messageP = document.getElementById('message');
 // Cargar todos los personajes al inicio
 async function loadCharacters() {
     try {
-        const { data, error } = await supabase
+        const { data, error } = await supabaseClient
             .from('characters')
             .select('*');
         
