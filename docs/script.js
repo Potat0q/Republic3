@@ -8,23 +8,25 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 // =============================================
 // 2. ESTADO DE LA APLICACIÓN
 // =============================================
-let currentUser = null; // Usuario autenticado
+let currentUser = null;
 let currentCharacter = null;
 let allCharacters = [];
 let lastRwTime = 0;
 let lastClaimTime = 0;
 let isGuest = false;
-let guestCounter = 0;
 
 // =============================================
 // 3. ELEMENTOS DEL DOM
 // =============================================
 const charImage = document.getElementById('char-image');
+const charPlaceholder = document.getElementById('charPlaceholder');
 const charName = document.getElementById('char-name');
 const charRarity = document.getElementById('char-rarity');
 const charValue = document.getElementById('char-value');
 const userCoinsSpan = document.getElementById('user-coins');
 const displayUsername = document.getElementById('displayUsername');
+const userBadge = document.getElementById('userBadge');
+const guestBadge = document.getElementById('guestBadge');
 const btnRw = document.getElementById('btn-rw');
 const btnClaim = document.getElementById('btn-claim');
 const messageP = document.getElementById('message');
@@ -32,6 +34,7 @@ const btnGuest = document.getElementById('btnGuest');
 const btnLogin = document.getElementById('btnLogin');
 const btnRegister = document.getElementById('btnRegister');
 const btnLogout = document.getElementById('btnLogout');
+const characterCard = document.getElementById('characterCard');
 
 // Modales
 const loginModal = document.getElementById('loginModal');
@@ -46,73 +49,122 @@ const switchToRegister = document.getElementById('switchToRegister');
 const switchToLogin = document.getElementById('switchToLogin');
 
 // =============================================
-// 4. FUNCIONES DE AUTENTICACIÓN
+// 4. FUNCIONES DE LOS MODALES
 // =============================================
 
-// Generar nombre de invitado
+function openModal(modal) {
+    modal.classList.add('active');
+    document.body.style.overflow = 'hidden';
+}
+
+function closeModal(modal) {
+    modal.classList.remove('active');
+    document.body.style.overflow = '';
+    if (modal === loginModal) {
+        loginError.textContent = '';
+        loginForm.reset();
+    }
+    if (modal === registerModal) {
+        registerError.textContent = '';
+        registerForm.reset();
+    }
+}
+
+// Cerrar modal al hacer click fuera
+document.addEventListener('click', (e) => {
+    if (e.target === loginModal) closeModal(loginModal);
+    if (e.target === registerModal) closeModal(registerModal);
+});
+
+// Cerrar con tecla ESC
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'Escape') {
+        closeModal(loginModal);
+        closeModal(registerModal);
+    }
+});
+
+// Event listeners de modales
+btnLogin.addEventListener('click', () => openModal(loginModal));
+btnRegister.addEventListener('click', () => openModal(registerModal));
+closeLoginModal.addEventListener('click', () => closeModal(loginModal));
+closeRegisterModal.addEventListener('click', () => closeModal(registerModal));
+
+switchToRegister.addEventListener('click', () => {
+    closeModal(loginModal);
+    setTimeout(() => openModal(registerModal), 300);
+});
+
+switchToLogin.addEventListener('click', () => {
+    closeModal(registerModal);
+    setTimeout(() => openModal(loginModal), 300);
+});
+
+// =============================================
+// 5. FUNCIONES DE AUTENTICACIÓN
+// =============================================
+
+// Generar nombre de invitado único
 function generateGuestName() {
-    guestCounter = parseInt(localStorage.getItem('guestCounter') || '0') + 1;
-    localStorage.setItem('guestCounter', guestCounter.toString());
-    return `Guest-${guestCounter}`;
+    const timestamp = Date.now().toString().slice(-6);
+    const random = Math.floor(Math.random() * 1000);
+    return `Guest-${timestamp}${random}`;
 }
 
 // Login como invitado
 async function loginAsGuest() {
     try {
+        showMessage('🔄 Creando invitado...');
+        
         const username = generateGuestName();
         
-        // Verificar si el nombre de guest ya existe
-        const { data: existing } = await supabaseClient
-            .from('profiles')
-            .select('id')
-            .eq('username', username)
-            .maybeSingle();
-        
-        if (existing) {
-            // Si existe, generar otro
-            return await loginAsGuest();
-        }
-        
-        // Crear usuario guest en la base de datos
         const { data, error } = await supabaseClient
             .from('profiles')
             .insert({
                 username: username,
                 is_guest: true,
-                coins: 50 // Monedas iniciales para invitados
+                coins: 50
             })
             .select()
             .single();
         
-        if (error) throw error;
+        if (error) {
+            if (error.code === '23505') {
+                return await loginAsGuest();
+            }
+            throw error;
+        }
         
         currentUser = data;
         isGuest = true;
         
-        // Crear cooldowns para el nuevo usuario
         await supabaseClient
             .from('cooldowns')
-            .insert({ user_id: currentUser.id });
+            .insert({ user_id: currentUser.id })
+            .catch(() => {});
         
         updateUI();
         showMessage(`🎮 ¡Bienvenido ${currentUser.username}! (Invitado)`);
+        
+        document.getElementById('authButtons').style.display = 'none';
+        btnLogout.style.display = 'block';
+        guestBadge.style.display = 'inline-block';
+        userBadge.style.display = 'none';
+        
         await loadCharacters();
         await rwCommand();
         
-        // Ocultar botones de autenticación
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        
     } catch (error) {
         console.error('Error en login guest:', error);
-        showMessage('❌ Error al crear invitado. Intenta de nuevo.');
+        showMessage('❌ Error al crear invitado: ' + (error.message || 'Intenta de nuevo'));
     }
 }
 
 // Login con email y contraseña
 async function loginWithEmail(email, password) {
     try {
-        // Primero, autenticar con Supabase Auth
+        showMessage('🔄 Iniciando sesión...');
+        
         const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
             email: email,
             password: password
@@ -120,20 +172,25 @@ async function loginWithEmail(email, password) {
         
         if (authError) throw authError;
         
-        // Obtener perfil del usuario
+        if (!authData.user) {
+            throw new Error('No se pudo autenticar el usuario');
+        }
+        
         const { data: profile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('*')
             .eq('id', authData.user.id)
-            .single();
+            .maybeSingle();
         
-        if (profileError) {
-            // Si no tiene perfil, crearlo
+        if (profileError && profileError.code !== 'PGRST116') throw profileError;
+        
+        if (!profile) {
+            const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
             const { data: newProfile, error: createError } = await supabaseClient
                 .from('profiles')
                 .insert({
                     id: authData.user.id,
-                    username: email.split('@')[0] + '_' + Math.floor(Math.random() * 1000),
+                    username: username,
                     email: email,
                     coins: 100
                 })
@@ -148,31 +205,32 @@ async function loginWithEmail(email, password) {
         
         isGuest = false;
         
-        // Verificar cooldowns
         const { data: cooldownData } = await supabaseClient
             .from('cooldowns')
             .select('*')
             .eq('user_id', currentUser.id)
-            .single();
+            .maybeSingle();
         
         if (!cooldownData) {
             await supabaseClient
                 .from('cooldowns')
-                .insert({ user_id: currentUser.id });
+                .insert({ user_id: currentUser.id })
+                .catch(() => {});
         }
         
         updateUI();
         showMessage(`✅ ¡Bienvenido ${currentUser.username}!`);
-        await loadCharacters();
-        await rwCommand();
         
-        // Ocultar botones de autenticación
         document.getElementById('authButtons').style.display = 'none';
         btnLogout.style.display = 'block';
+        userBadge.style.display = 'inline-block';
+        guestBadge.style.display = 'none';
         
-        // Cerrar modal
-        loginModal.classList.remove('active');
+        closeModal(loginModal);
         loginError.textContent = '';
+        
+        await loadCharacters();
+        await rwCommand();
         
     } catch (error) {
         console.error('Error en login:', error);
@@ -183,7 +241,8 @@ async function loginWithEmail(email, password) {
 // Registro de nuevo usuario
 async function registerUser(username, email, password) {
     try {
-        // Verificar si el username ya existe
+        showMessage('🔄 Registrando usuario...');
+        
         const { data: existingUser } = await supabaseClient
             .from('profiles')
             .select('id')
@@ -195,7 +254,6 @@ async function registerUser(username, email, password) {
             return;
         }
         
-        // Verificar si el email ya existe
         const { data: existingEmail } = await supabaseClient
             .from('profiles')
             .select('id')
@@ -207,19 +265,28 @@ async function registerUser(username, email, password) {
             return;
         }
         
-        // Crear usuario en Supabase Auth
         const { data: authData, error: authError } = await supabaseClient.auth.signUp({
             email: email,
-            password: password
+            password: password,
+            options: {
+                data: {
+                    username: username
+                }
+            }
         });
         
-        if (authError) throw authError;
+        if (authError) {
+            if (authError.message.includes('already registered')) {
+                registerError.textContent = '❌ Este correo ya está registrado';
+                return;
+            }
+            throw authError;
+        }
         
         if (!authData.user) {
             throw new Error('No se pudo crear el usuario');
         }
         
-        // Crear perfil
         const { data: profile, error: profileError } = await supabaseClient
             .from('profiles')
             .insert({
@@ -236,23 +303,24 @@ async function registerUser(username, email, password) {
         currentUser = profile;
         isGuest = false;
         
-        // Crear cooldowns
         await supabaseClient
             .from('cooldowns')
-            .insert({ user_id: currentUser.id });
+            .insert({ user_id: currentUser.id })
+            .catch(() => {});
         
         updateUI();
         showMessage(`✅ ¡Cuenta creada! Bienvenido ${currentUser.username}`);
-        await loadCharacters();
-        await rwCommand();
         
-        // Ocultar botones de autenticación
         document.getElementById('authButtons').style.display = 'none';
         btnLogout.style.display = 'block';
+        userBadge.style.display = 'inline-block';
+        guestBadge.style.display = 'none';
         
-        // Cerrar modal
-        registerModal.classList.remove('active');
+        closeModal(registerModal);
         registerError.textContent = '';
+        
+        await loadCharacters();
+        await rwCommand();
         
     } catch (error) {
         console.error('Error en registro:', error);
@@ -263,7 +331,6 @@ async function registerUser(username, email, password) {
 // Cerrar sesión
 async function logout() {
     try {
-        // Si es guest, no hacemos auth logout
         if (!isGuest) {
             await supabaseClient.auth.signOut();
         }
@@ -273,16 +340,18 @@ async function logout() {
         currentCharacter = null;
         allCharacters = [];
         
-        // Resetear UI
         displayUsername.textContent = 'Invitado';
         userCoinsSpan.textContent = '0';
         charName.textContent = '???';
         charRarity.textContent = '⭐ Esperando...';
         charValue.textContent = '🪙 0 monedas';
         charImage.style.display = 'none';
+        charPlaceholder.style.display = 'flex';
         btnClaim.disabled = true;
+        characterCard.classList.remove('has-character');
+        userBadge.style.display = 'none';
+        guestBadge.style.display = 'none';
         
-        // Mostrar botones de autenticación
         document.getElementById('authButtons').style.display = 'flex';
         btnLogout.style.display = 'none';
         
@@ -295,7 +364,7 @@ async function logout() {
 }
 
 // =============================================
-// 5. FUNCIONES DEL GACHA
+// 6. FUNCIONES DEL GACHA
 // =============================================
 
 async function loadCharacters() {
@@ -306,18 +375,33 @@ async function loadCharacters() {
         
         if (error) throw error;
         
-        allCharacters = data || [];
-        console.log(`✅ ${allCharacters.length} personajes cargados`);
-        
-        if (allCharacters.length === 0) {
-            showMessage('⚠️ No hay personajes en la base de datos');
-            return false;
+        if (data && data.length > 0) {
+            allCharacters = data;
+        } else {
+            allCharacters = [
+                { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
+                { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
+                { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
+                { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
+                { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
+            ];
+            showMessage('📝 Usando personajes de ejemplo');
         }
+        
+        console.log(`✅ ${allCharacters.length} personajes cargados`);
         return true;
+        
     } catch (error) {
         console.error('Error cargando personajes:', error);
-        showMessage('❌ Error al cargar personajes');
-        return false;
+        allCharacters = [
+            { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
+            { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
+            { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
+            { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
+            { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
+        ];
+        showMessage('📝 Usando personajes de ejemplo (error de conexión)');
+        return true;
     }
 }
 
@@ -351,22 +435,23 @@ async function rwCommand() {
         currentCharacter = character;
         displayCharacter(currentCharacter);
         btnClaim.disabled = false;
+        characterCard.classList.add('has-character');
         showMessage('✨ ¡Personaje disponible! Usa #claim para reclamarlo.');
         lastRwTime = now;
 
-        // Actualizar cooldown en DB (solo si no es guest)
         if (!isGuest && currentUser) {
             await supabaseClient
                 .from('cooldowns')
                 .upsert({ 
                     user_id: currentUser.id, 
                     last_rw: new Date().toISOString() 
-                });
+                })
+                .catch(() => {});
         }
 
     } catch (error) {
         console.error('Error en #rw:', error);
-        showMessage('❌ Error al obtener personaje: ' + error.message);
+        showMessage('❌ Error al obtener personaje');
     }
 }
 
@@ -389,15 +474,17 @@ async function claimCommand() {
     }
 
     try {
-        // Si es guest, no guardar en DB, solo simular
+        const coinsToAdd = currentCharacter.value || 0;
+        
         if (isGuest) {
-            showMessage(`🎮 [MODO GUEST] Reclamaste a ${currentCharacter.name}! +${currentCharacter.value || 0} monedas (no se guarda)`);
+            currentUser.coins = (currentUser.coins || 0) + coinsToAdd;
+            updateUI();
+            showMessage(`🎮 [MODO GUEST] Reclamaste a ${currentCharacter.name}! +${coinsToAdd} monedas (no se guarda)`);
             lastClaimTime = now;
             setTimeout(() => rwCommand(), 1000);
             return;
         }
 
-        // Usuario registrado: guardar en DB
         const { data: existing, error: checkError } = await supabaseClient
             .from('inventory')
             .select('id')
@@ -405,7 +492,7 @@ async function claimCommand() {
             .eq('character_id', currentCharacter.id)
             .maybeSingle();
 
-        if (checkError) throw checkError;
+        if (checkError && checkError.code !== 'PGRST116') throw checkError;
         
         if (existing) {
             showMessage('⚠️ Ya tienes este personaje.');
@@ -413,7 +500,6 @@ async function claimCommand() {
             return;
         }
 
-        // Añadir al inventario
         const { error: insertError } = await supabaseClient
             .from('inventory')
             .insert({
@@ -423,8 +509,6 @@ async function claimCommand() {
 
         if (insertError) throw insertError;
 
-        // Actualizar monedas
-        const coinsToAdd = currentCharacter.value || 0;
         const newCoins = (currentUser.coins || 0) + coinsToAdd;
         
         const { error: updateError } = await supabaseClient
@@ -439,31 +523,39 @@ async function claimCommand() {
         showMessage(`✅ ¡Reclamaste a ${currentCharacter.name}! +${coinsToAdd} monedas.`);
         lastClaimTime = now;
 
-        // Actualizar cooldown
         await supabaseClient
             .from('cooldowns')
             .upsert({ 
                 user_id: currentUser.id, 
                 last_claim: new Date().toISOString() 
-            });
+            })
+            .catch(() => {});
 
         setTimeout(() => rwCommand(), 1000);
 
     } catch (error) {
         console.error('Error en #claim:', error);
-        showMessage('❌ Error al reclamar personaje.');
+        showMessage('❌ Error al reclamar personaje: ' + (error.message || ''));
     }
 }
 
 // =============================================
-// 6. FUNCIONES DE UI
+// 7. FUNCIONES DE UI
 // =============================================
 
 function displayCharacter(character) {
     if (!character) return;
     
-    charImage.src = character.image_url || '';
-    charImage.style.display = character.image_url ? 'block' : 'none';
+    if (character.image_url) {
+        charImage.src = character.image_url;
+        charImage.style.display = 'block';
+        charPlaceholder.style.display = 'none';
+    } else {
+        charImage.style.display = 'none';
+        charPlaceholder.style.display = 'flex';
+        charPlaceholder.textContent = '⭐';
+    }
+    
     charName.textContent = character.name || 'Nombre desconocido';
     charRarity.textContent = `⭐ Rareza: ${character.rarity || 'Común'}`;
     charValue.textContent = `🪙 Valor: ${character.value || 0} monedas`;
@@ -485,7 +577,7 @@ function showMessage(text) {
 }
 
 // =============================================
-// 7. FUNCIONES DE INVENTARIO
+// 8. FUNCIONES DE INVENTARIO
 // =============================================
 
 async function showInventory() {
@@ -504,7 +596,7 @@ async function showInventory() {
             .from('inventory')
             .select(`
                 character_id,
-                characters (
+                characters!inner (
                     name,
                     rarity,
                     value
@@ -529,51 +621,74 @@ async function showInventory() {
 }
 
 // =============================================
-// 8. INICIALIZACIÓN
+// 9. INICIALIZACIÓN
 // =============================================
 async function init() {
-    // Verificar si hay sesión activa
-    const { data: { session } } = await supabaseClient.auth.getSession();
-    
-    if (session) {
-        // Usuario autenticado
-        const { data: profile } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('id', session.user.id)
-            .single();
+    try {
+        const { data: { session } } = await supabaseClient.auth.getSession();
         
-        if (profile) {
-            currentUser = profile;
-            isGuest = false;
-            document.getElementById('authButtons').style.display = 'none';
-            btnLogout.style.display = 'block';
-            updateUI();
-            showMessage(`✅ Bienvenido de nuevo ${currentUser.username}`);
-            await loadCharacters();
-            await rwCommand();
-            return;
+        if (session) {
+            const { data: profile } = await supabaseClient
+                .from('profiles')
+                .select('*')
+                .eq('id', session.user.id)
+                .maybeSingle();
+            
+            if (profile) {
+                currentUser = profile;
+                isGuest = false;
+                document.getElementById('authButtons').style.display = 'none';
+                btnLogout.style.display = 'block';
+                userBadge.style.display = 'inline-block';
+                guestBadge.style.display = 'none';
+                updateUI();
+                showMessage(`✅ Bienvenido de nuevo ${currentUser.username}`);
+                await loadCharacters();
+                await rwCommand();
+                return;
+            }
         }
+    } catch (error) {
+        console.log('No hay sesión activa');
     }
-
-    // Si no hay sesión, mostrar botones de autenticación
+    
     showMessage('🎮 ¡Bienvenido! Inicia sesión o juega como invitado.');
 }
 
 // =============================================
-// 9. EVENT LISTENERS
+// 10. EVENT LISTENERS
 // =============================================
 
-// Botones principales
 btnRw.addEventListener('click', rwCommand);
 btnClaim.addEventListener('click', claimCommand);
-
-// Autenticación
 btnGuest.addEventListener('click', loginAsGuest);
 btnLogout.addEventListener('click', logout);
 
-// Mostrar modales
-btnLogin.addEventListener('click', () => {
-    loginModal.classList.add('active');
-    loginError.textContent = '';
+// Login form
+loginForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const email = document.getElementById('loginEmail').value;
+    const password = document.getElementById('loginPassword').value;
+    loginWithEmail(email, password);
 });
+
+// Register form
+registerForm.addEventListener('submit', (e) => {
+    e.preventDefault();
+    const username = document.getElementById('registerUsername').value;
+    const email = document.getElementById('registerEmail').value;
+    const password = document.getElementById('registerPassword').value;
+    registerUser(username, email, password);
+});
+
+// Tecla 'I' para inventario
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'i' || e.key === 'I') {
+        showInventory();
+    }
+});
+
+// =============================================
+// 11. INICIAR
+// =============================================
+init();
