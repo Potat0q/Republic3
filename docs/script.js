@@ -367,7 +367,7 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA
+// 6. FUNCIONES DEL GACHA (CORREGIDAS)
 // =============================================
 
 async function loadCharacters() {
