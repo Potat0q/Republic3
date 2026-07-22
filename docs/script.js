@@ -70,13 +70,11 @@ function closeModal(modal) {
     }
 }
 
-// Cerrar modal al hacer click fuera
 document.addEventListener('click', (e) => {
     if (e.target === loginModal) closeModal(loginModal);
     if (e.target === registerModal) closeModal(registerModal);
 });
 
-// Cerrar con tecla ESC
 document.addEventListener('keydown', (e) => {
     if (e.key === 'Escape') {
         closeModal(loginModal);
@@ -84,7 +82,6 @@ document.addEventListener('keydown', (e) => {
     }
 });
 
-// Event listeners de modales
 btnLogin.addEventListener('click', () => openModal(loginModal));
 btnRegister.addEventListener('click', () => openModal(registerModal));
 closeLoginModal.addEventListener('click', () => closeModal(loginModal));
@@ -104,14 +101,12 @@ switchToLogin.addEventListener('click', () => {
 // 5. FUNCIONES DE AUTENTICACIÓN
 // =============================================
 
-// Generar nombre de invitado único
 function generateGuestName() {
     const timestamp = Date.now().toString().slice(-6);
     const random = Math.floor(Math.random() * 1000);
     return `Guest-${timestamp}${random}`;
 }
 
-// Login como invitado (CORREGIDO)
 async function loginAsGuest() {
     try {
         showMessage('🔄 Creando invitado...');
@@ -130,7 +125,6 @@ async function loginAsGuest() {
         
         if (error) {
             if (error.code === '23505') {
-                // Si el nombre ya existe, reintentar
                 return await loginAsGuest();
             }
             throw error;
@@ -139,7 +133,6 @@ async function loginAsGuest() {
         currentUser = data;
         isGuest = true;
         
-        // Crear cooldown para el invitado
         try {
             await supabaseClient
                 .from('cooldowns')
@@ -165,7 +158,6 @@ async function loginAsGuest() {
     }
 }
 
-// Login con email y contraseña
 async function loginWithEmail(email, password) {
     try {
         showMessage('🔄 Iniciando sesión...');
@@ -247,7 +239,6 @@ async function loginWithEmail(email, password) {
     }
 }
 
-// Registro de nuevo usuario
 async function registerUser(username, email, password) {
     try {
         showMessage('🔄 Registrando usuario...');
@@ -341,7 +332,6 @@ async function registerUser(username, email, password) {
     }
 }
 
-// Cerrar sesión
 async function logout() {
     try {
         if (!isGuest) {
@@ -377,56 +367,52 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA
+// 6. FUNCIONES DEL GACHA (ACTUALIZADAS)
 // =============================================
 
 async function loadCharacters() {
     try {
+        // ✅ CONSULTA A LA TABLA REAL
         const { data, error } = await supabaseClient
             .from('characters')
             .select('*');
         
         if (error) {
             console.error('Error cargando personajes:', error);
-            // Usar personajes de ejemplo
-            allCharacters = [
-                { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
-                { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
-                { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
-                { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
-                { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
-            ];
-            showMessage('📝 Usando personajes de ejemplo');
+            // Fallback a personajes de ejemplo
+            allCharacters = getExampleCharacters();
+            showMessage('📝 Usando personajes de ejemplo (error de conexión)');
             return true;
         }
         
         if (data && data.length > 0) {
             allCharacters = data;
-            console.log(`✅ ${allCharacters.length} personajes cargados`);
+            console.log(`✅ ${allCharacters.length} personajes cargados desde Supabase`);
+            showMessage(`🎮 ${allCharacters.length} personajes disponibles`);
+            return true;
         } else {
-            allCharacters = [
-                { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
-                { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
-                { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
-                { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
-                { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
-            ];
-            showMessage('📝 Usando personajes de ejemplo');
+            // Si no hay datos, usar ejemplos
+            allCharacters = getExampleCharacters();
+            showMessage('📝 Usando personajes de ejemplo (tabla vacía)');
+            return true;
         }
-        return true;
         
     } catch (error) {
         console.error('Error en loadCharacters:', error);
-        allCharacters = [
-            { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
-            { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
-            { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
-            { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
-            { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
-        ];
-        showMessage('📝 Usando personajes de ejemplo (error de conexión)');
+        allCharacters = getExampleCharacters();
+        showMessage('📝 Usando personajes de ejemplo (error)');
         return true;
     }
+}
+
+function getExampleCharacters() {
+    return [
+        { mal_id: 1, name: 'Pikachu', rarity: 'Legendario', value: 1000, image_jpg_url: '' },
+        { mal_id: 2, name: 'Charizard', rarity: 'Épico', value: 500, image_jpg_url: '' },
+        { mal_id: 3, name: 'Bulbasaur', rarity: 'Común', value: 100, image_jpg_url: '' },
+        { mal_id: 4, name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_jpg_url: '' },
+        { mal_id: 5, name: 'Eevee', rarity: 'Raro', value: 300, image_jpg_url: '' }
+    ];
 }
 
 function getRandomCharacter() {
@@ -435,16 +421,10 @@ function getRandomCharacter() {
     return allCharacters[randomIndex];
 }
 
+// ⚡ rwCommand: SIN COOLDOWN
 async function rwCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
-        return;
-    }
-
-    const now = Date.now();
-    if (now - lastRwTime < 60000) {
-        const remaining = Math.ceil((60000 - (now - lastRwTime)) / 1000);
-        showMessage(`⏳ Espera ${remaining} segundos para usar #rw.`);
         return;
     }
 
@@ -461,7 +441,6 @@ async function rwCommand() {
         btnClaim.disabled = false;
         characterCard.classList.add('has-character');
         showMessage('✨ ¡Personaje disponible! Usa #claim para reclamarlo.');
-        lastRwTime = now;
 
         if (!isGuest && currentUser) {
             try {
@@ -482,6 +461,7 @@ async function rwCommand() {
     }
 }
 
+// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS
 async function claimCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
@@ -494,8 +474,8 @@ async function claimCommand() {
     }
 
     const now = Date.now();
-    if (now - lastClaimTime < 300000) {
-        const remaining = Math.ceil((300000 - (now - lastClaimTime)) / 1000);
+    if (now - lastClaimTime < 30000) {  // 30 segundos
+        const remaining = Math.ceil((30000 - (now - lastClaimTime)) / 1000);
         showMessage(`⏳ Espera ${remaining} segundos para reclamar.`);
         return;
     }
@@ -508,15 +488,16 @@ async function claimCommand() {
             updateUI();
             showMessage(`🎮 [MODO GUEST] Reclamaste a ${currentCharacter.name}! +${coinsToAdd} monedas (no se guarda)`);
             lastClaimTime = now;
-            setTimeout(() => rwCommand(), 1000);
+            setTimeout(() => rwCommand(), 500);
             return;
         }
 
+        // Verificar si ya tiene el personaje
         const { data: existing, error: checkError } = await supabaseClient
             .from('inventory')
             .select('id')
             .eq('user_id', currentUser.id)
-            .eq('character_id', currentCharacter.id)
+            .eq('character_id', currentCharacter.mal_id)  // ← USAR mal_id
             .maybeSingle();
 
         if (checkError && checkError.code !== 'PGRST116') throw checkError;
@@ -527,15 +508,17 @@ async function claimCommand() {
             return;
         }
 
+        // Añadir al inventario
         const { error: insertError } = await supabaseClient
             .from('inventory')
             .insert({
                 user_id: currentUser.id,
-                character_id: currentCharacter.id
+                character_id: currentCharacter.mal_id  // ← USAR mal_id
             });
 
         if (insertError) throw insertError;
 
+        // Actualizar monedas
         const newCoins = (currentUser.coins || 0) + coinsToAdd;
         
         const { error: updateError } = await supabaseClient
@@ -561,7 +544,7 @@ async function claimCommand() {
             console.warn('Error actualizando cooldown de claim:', cooldownError);
         }
 
-        setTimeout(() => rwCommand(), 1000);
+        setTimeout(() => rwCommand(), 500);
 
     } catch (error) {
         console.error('Error en #claim:', error);
@@ -576,8 +559,11 @@ async function claimCommand() {
 function displayCharacter(character) {
     if (!character) return;
     
-    if (character.image_url) {
-        charImage.src = character.image_url;
+    // ✅ USAR image_jpg_url (la columna que tiene el CSV)
+    const imgUrl = character.image_jpg_url || character.image_webp_url || '';
+    
+    if (imgUrl) {
+        charImage.src = imgUrl;
         charImage.style.display = 'block';
         charPlaceholder.style.display = 'none';
     } else {
@@ -694,7 +680,6 @@ btnClaim.addEventListener('click', claimCommand);
 btnGuest.addEventListener('click', loginAsGuest);
 btnLogout.addEventListener('click', logout);
 
-// Login form
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const email = document.getElementById('loginEmail').value;
@@ -702,7 +687,6 @@ loginForm.addEventListener('submit', (e) => {
     loginWithEmail(email, password);
 });
 
-// Register form
 registerForm.addEventListener('submit', (e) => {
     e.preventDefault();
     const username = document.getElementById('registerUsername').value;
@@ -711,7 +695,6 @@ registerForm.addEventListener('submit', (e) => {
     registerUser(username, email, password);
 });
 
-// Tecla 'I' para inventario
 document.addEventListener('keydown', (e) => {
     if (e.key === 'i' || e.key === 'I') {
         showInventory();
