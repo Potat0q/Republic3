@@ -1,7 +1,7 @@
 // =============================================
 // 1. CONFIGURACIÓN DE SUPABASE
 // =============================================
-const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co/rest/v1/';
+const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co';
 const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aHR2amtqbmZ0aWp6YXp0enFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjIyMzMsImV4cCI6MjEwMDIzODIzM30.HQGkaabDSjUiK-9JxczPY7R72zr8nEdTK32Pk6PMkDM';
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
