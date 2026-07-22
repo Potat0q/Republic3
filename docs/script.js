@@ -111,7 +111,7 @@ function generateGuestName() {
     return `Guest-${timestamp}${random}`;
 }
 
-// Login como invitado
+// Login como invitado (CORREGIDO)
 async function loginAsGuest() {
     try {
         showMessage('🔄 Creando invitado...');
@@ -130,6 +130,7 @@ async function loginAsGuest() {
         
         if (error) {
             if (error.code === '23505') {
+                // Si el nombre ya existe, reintentar
                 return await loginAsGuest();
             }
             throw error;
@@ -138,10 +139,14 @@ async function loginAsGuest() {
         currentUser = data;
         isGuest = true;
         
-        await supabaseClient
-            .from('cooldowns')
-            .insert({ user_id: currentUser.id })
-            .catch(() => {});
+        // Crear cooldown para el invitado
+        try {
+            await supabaseClient
+                .from('cooldowns')
+                .insert({ user_id: currentUser.id });
+        } catch (cooldownError) {
+            console.warn('Error al crear cooldown:', cooldownError);
+        }
         
         updateUI();
         showMessage(`🎮 ¡Bienvenido ${currentUser.username}! (Invitado)`);
@@ -213,10 +218,13 @@ async function loginWithEmail(email, password) {
             .maybeSingle();
         
         if (!cooldownData) {
-            await supabaseClient
-                .from('cooldowns')
-                .insert({ user_id: currentUser.id })
-                .catch(() => {});
+            try {
+                await supabaseClient
+                    .from('cooldowns')
+                    .insert({ user_id: currentUser.id });
+            } catch (cooldownError) {
+                console.warn('Error al crear cooldown:', cooldownError);
+            }
         }
         
         updateUI();
@@ -305,10 +313,13 @@ async function registerUser(username, email, password) {
         currentUser = profile;
         isGuest = false;
         
-        await supabaseClient
-            .from('cooldowns')
-            .insert({ user_id: currentUser.id })
-            .catch(() => {});
+        try {
+            await supabaseClient
+                .from('cooldowns')
+                .insert({ user_id: currentUser.id });
+        } catch (cooldownError) {
+            console.warn('Error al crear cooldown:', cooldownError);
+        }
         
         updateUI();
         showMessage(`✅ ¡Cuenta creada! Bienvenido ${currentUser.username}`);
@@ -375,7 +386,19 @@ async function loadCharacters() {
             .from('characters')
             .select('*');
         
-        if (error) throw error;
+        if (error) {
+            console.error('Error cargando personajes:', error);
+            // Usar personajes de ejemplo
+            allCharacters = [
+                { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
+                { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
+                { id: '3', name: 'Bulbasaur', rarity: 'Común', value: 100, image_url: '' },
+                { id: '4', name: 'Mewtwo', rarity: 'Mítico', value: 2000, image_url: '' },
+                { id: '5', name: 'Eevee', rarity: 'Raro', value: 300, image_url: '' }
+            ];
+            showMessage('📝 Usando personajes de ejemplo');
+            return true;
+        }
         
         if (data && data.length > 0) {
             allCharacters = data;
@@ -393,7 +416,7 @@ async function loadCharacters() {
         return true;
         
     } catch (error) {
-        console.error('Error cargando personajes:', error);
+        console.error('Error en loadCharacters:', error);
         allCharacters = [
             { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
             { id: '2', name: 'Charizard', rarity: 'Épico', value: 500, image_url: '' },
@@ -441,13 +464,16 @@ async function rwCommand() {
         lastRwTime = now;
 
         if (!isGuest && currentUser) {
-            await supabaseClient
-                .from('cooldowns')
-                .upsert({ 
-                    user_id: currentUser.id, 
-                    last_rw: new Date().toISOString() 
-                })
-                .catch(() => {});
+            try {
+                await supabaseClient
+                    .from('cooldowns')
+                    .upsert({ 
+                        user_id: currentUser.id, 
+                        last_rw: new Date().toISOString() 
+                    });
+            } catch (cooldownError) {
+                console.warn('Error actualizando cooldown de rw:', cooldownError);
+            }
         }
 
     } catch (error) {
@@ -524,13 +550,16 @@ async function claimCommand() {
         showMessage(`✅ ¡Reclamaste a ${currentCharacter.name}! +${coinsToAdd} monedas.`);
         lastClaimTime = now;
 
-        await supabaseClient
-            .from('cooldowns')
-            .upsert({ 
-                user_id: currentUser.id, 
-                last_claim: new Date().toISOString() 
-            })
-            .catch(() => {});
+        try {
+            await supabaseClient
+                .from('cooldowns')
+                .upsert({ 
+                    user_id: currentUser.id, 
+                    last_claim: new Date().toISOString() 
+                });
+        } catch (cooldownError) {
+            console.warn('Error actualizando cooldown de claim:', cooldownError);
+        }
 
         setTimeout(() => rwCommand(), 1000);
 
