@@ -3,38 +3,352 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Gacha - Republic Momer Games</title>
-    <link rel="stylesheet" href="style.css">
+    <title>🎮 Gacha System</title>
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+        }
+        body {
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            background: linear-gradient(135deg, #1a1a2e, #16213e, #0f3460);
+            min-height: 100vh;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            color: #fff;
+        }
+        .container {
+            background: rgba(255, 255, 255, 0.05);
+            backdrop-filter: blur(10px);
+            border-radius: 20px;
+            padding: 30px;
+            max-width: 500px;
+            width: 90%;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .header {
+            text-align: center;
+            margin-bottom: 25px;
+        }
+        .header h1 {
+            font-size: 2em;
+            background: linear-gradient(45deg, #f7971e, #ffd200);
+            background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+        .user-info {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255, 255, 255, 0.1);
+            padding: 12px 18px;
+            border-radius: 12px;
+            margin-bottom: 20px;
+        }
+        .user-info .username {
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .user-info .coins {
+            color: #4ecdc4;
+            font-size: 1.1em;
+        }
+        .btn-logout {
+            background: #ff6b6b;
+            border: none;
+            color: white;
+            padding: 5px 15px;
+            border-radius: 8px;
+            cursor: pointer;
+            font-size: 0.8em;
+            transition: all 0.3s;
+        }
+        .btn-logout:hover {
+            background: #ff5252;
+            transform: scale(1.05);
+        }
+        .character-card {
+            background: rgba(255, 255, 255, 0.08);
+            border-radius: 15px;
+            padding: 20px;
+            text-align: center;
+            margin-bottom: 20px;
+            min-height: 200px;
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+        }
+        .character-card img {
+            max-width: 150px;
+            height: auto;
+            border-radius: 10px;
+            margin-bottom: 10px;
+        }
+        .character-card .char-name {
+            font-size: 1.5em;
+            font-weight: bold;
+            color: #ffd700;
+        }
+        .character-card .char-rarity {
+            color: #aaa;
+            font-size: 0.9em;
+        }
+        .character-card .char-value {
+            color: #4ecdc4;
+            font-size: 1.1em;
+        }
+        .buttons {
+            display: flex;
+            gap: 10px;
+            margin-bottom: 15px;
+        }
+        .buttons button {
+            flex: 1;
+            padding: 12px;
+            border: none;
+            border-radius: 10px;
+            font-size: 1em;
+            font-weight: bold;
+            cursor: pointer;
+            transition: all 0.3s;
+            text-transform: uppercase;
+            letter-spacing: 1px;
+        }
+        .buttons button:disabled {
+            opacity: 0.5;
+            cursor: not-allowed;
+        }
+        .btn-rw {
+            background: linear-gradient(45deg, #f7971e, #ffd200);
+            color: #1a1a2e;
+        }
+        .btn-rw:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(255, 215, 0, 0.3);
+        }
+        .btn-claim {
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            color: #fff;
+        }
+        .btn-claim:hover:not(:disabled) {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 206, 201, 0.3);
+        }
+        .message {
+            background: rgba(255, 255, 255, 0.05);
+            padding: 12px;
+            border-radius: 10px;
+            text-align: center;
+            min-height: 50px;
+            font-size: 0.95em;
+            color: #ddd;
+            margin-bottom: 15px;
+        }
+        .auth-buttons {
+            display: flex;
+            gap: 10px;
+            justify-content: center;
+            flex-wrap: wrap;
+        }
+        .auth-buttons button {
+            padding: 8px 20px;
+            border: none;
+            border-radius: 8px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s;
+        }
+        .btn-guest {
+            background: #6c5ce7;
+            color: white;
+        }
+        .btn-guest:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(108, 92, 231, 0.3);
+        }
+        .btn-login {
+            background: #00b894;
+            color: white;
+        }
+        .btn-login:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(0, 184, 148, 0.3);
+        }
+        .btn-register {
+            background: #fdcb6e;
+            color: #1a1a2e;
+        }
+        .btn-register:hover {
+            transform: scale(1.05);
+            box-shadow: 0 0 20px rgba(253, 203, 110, 0.3);
+        }
+
+        /* MODAL */
+        .modal {
+            display: none;
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background: rgba(0, 0, 0, 0.7);
+            justify-content: center;
+            align-items: center;
+            z-index: 1000;
+        }
+        .modal.active {
+            display: flex;
+        }
+        .modal-content {
+            background: #1a1a2e;
+            padding: 30px;
+            border-radius: 20px;
+            max-width: 400px;
+            width: 90%;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+        .modal-content h2 {
+            text-align: center;
+            margin-bottom: 20px;
+            color: #ffd700;
+        }
+        .modal-content input {
+            width: 100%;
+            padding: 12px;
+            margin-bottom: 12px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            border-radius: 8px;
+            background: rgba(255, 255, 255, 0.05);
+            color: white;
+            font-size: 1em;
+        }
+        .modal-content input::placeholder {
+            color: #666;
+        }
+        .modal-content button[type="submit"] {
+            width: 100%;
+            padding: 12px;
+            background: linear-gradient(45deg, #00b894, #00cec9);
+            border: none;
+            border-radius: 8px;
+            color: white;
+            font-weight: bold;
+            font-size: 1em;
+            cursor: pointer;
+            transition: all 0.3s;
+        }
+        .modal-content button[type="submit"]:hover {
+            transform: scale(1.02);
+        }
+        .modal-close {
+            background: #ff6b6b;
+            border: none;
+            color: white;
+            padding: 8px 20px;
+            border-radius: 8px;
+            cursor: pointer;
+            margin-top: 10px;
+            width: 100%;
+        }
+        .modal-close:hover {
+            background: #ff5252;
+        }
+        .modal-switch {
+            text-align: center;
+            margin-top: 15px;
+            color: #aaa;
+        }
+        .modal-switch a {
+            color: #ffd700;
+            cursor: pointer;
+            text-decoration: underline;
+        }
+        .error-message {
+            color: #ff6b6b;
+            font-size: 0.9em;
+            text-align: center;
+            margin-top: 10px;
+        }
+    </style>
 </head>
 <body>
-    <div id="app">
-        <h1>🎴 Gacha de Personajes</h1>
-        
-        <div id="user-area">
-            <p>Usuario: <span id="user-name">Invitado</span></p>
-            <p>🪙 Monedas: <span id="user-coins">0</span></p>
+    <div class="container">
+        <div class="header">
+            <h1>🎮 Gacha System</h1>
         </div>
 
-        <div id="gacha-box">
-            <div id="character-display">
-                <img id="char-image" src="" alt="Personaje" style="display: none;">
-                <h2 id="char-name">???</h2>
-                <p id="char-rarity">⭐ Rareza: ???</p>
-                <p id="char-value">🪙 Valor: ???</p>
-            </div>
-            
-            <div id="button-area">
-                <button id="btn-rw">🔄 #rw</button>
-                <button id="btn-claim" disabled>📥 #claim</button>
-            </div>
-            
-            <p id="message"></p>
+        <!-- Info de usuario -->
+        <div class="user-info" id="userInfo">
+            <span class="username" id="displayUsername">Invitado</span>
+            <span class="coins">🪙 <span id="user-coins">0</span></span>
+            <button class="btn-logout" id="btnLogout" style="display:none;">Salir</button>
         </div>
 
-        <button id="btn-inventory">📂 Ver Colección</button>
+        <!-- Personaje -->
+        <div class="character-card" id="characterCard">
+            <img id="char-image" src="" alt="Personaje" style="display:none;">
+            <div class="char-name" id="char-name">???</div>
+            <div class="char-rarity" id="char-rarity">⭐ Esperando...</div>
+            <div class="char-value" id="char-value">🪙 0 monedas</div>
+        </div>
+
+        <!-- Botones de acción -->
+        <div class="buttons">
+            <button class="btn-rw" id="btn-rw">🎲 #rw</button>
+            <button class="btn-claim" id="btn-claim" disabled>📥 #claim</button>
+        </div>
+
+        <!-- Mensaje -->
+        <div class="message" id="message">🎮 ¡Bienvenido! Inicia sesión o juega como invitado.</div>
+
+        <!-- Botones de autenticación -->
+        <div class="auth-buttons" id="authButtons">
+            <button class="btn-guest" id="btnGuest">🎮 Invitado</button>
+            <button class="btn-login" id="btnLogin">🔑 Iniciar Sesión</button>
+            <button class="btn-register" id="btnRegister">📝 Registrarse</button>
+        </div>
     </div>
 
-    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+    <!-- MODAL LOGIN -->
+    <div class="modal" id="loginModal">
+        <div class="modal-content">
+            <h2>🔑 Iniciar Sesión</h2>
+            <form id="loginForm">
+                <input type="email" id="loginEmail" placeholder="Correo electrónico" required>
+                <input type="password" id="loginPassword" placeholder="Contraseña" required>
+                <button type="submit">Iniciar Sesión</button>
+            </form>
+            <div class="modal-switch">
+                ¿No tienes cuenta? <a id="switchToRegister">Regístrate aquí</a>
+            </div>
+            <button class="modal-close" id="closeLoginModal">Cerrar</button>
+            <div id="loginError" class="error-message"></div>
+        </div>
+    </div>
+
+    <!-- MODAL REGISTER -->
+    <div class="modal" id="registerModal">
+        <div class="modal-content">
+            <h2>📝 Registrarse</h2>
+            <form id="registerForm">
+                <input type="text" id="registerUsername" placeholder="Nombre de usuario" required>
+                <input type="email" id="registerEmail" placeholder="Correo electrónico" required>
+                <input type="password" id="registerPassword" placeholder="Contraseña" required>
+                <button type="submit">Registrarse</button>
+            </form>
+            <div class="modal-switch">
+                ¿Ya tienes cuenta? <a id="switchToLogin">Inicia sesión aquí</a>
+            </div>
+            <button class="modal-close" id="closeRegisterModal">Cerrar</button>
+            <div id="registerError" class="error-message"></div>
+        </div>
+    </div>
+
+    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
 </html>
