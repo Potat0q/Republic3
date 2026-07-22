@@ -1,15 +1,24 @@
 // =============================================
 // 1. CONFIGURACIÓN DE SUPABASE
 // =============================================
-const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co/rest/v1/';  // Tu URL
-const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aHR2amtqbmZ0aWp6YXp0enFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjIyMzMsImV4cCI6MjEwMDIzODIzM30.HQGkaabDSjUiK-9JxczPY7R72zr8nEdTK32Pk6PMkDM';  // Tu clave anon public
+const supabaseUrl = 'https://yzhtvjkjnftijzaztzqs.supabase.co/rest/v1/';
+const supabaseKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inl6aHR2amtqbmZ0aWp6YXp0enFzIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODQ2NjIyMzMsImV4cCI6MjEwMDIzODIzM30.HQGkaabDSjUiK-9JxczPY7R72zr8nEdTK32Pk6PMkDM';
 const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 
-let currentUser = null;      // Usuario autenticado
-let currentCharacter = null; // Personaje actual del gacha
+// =============================================
+// 2. USUARIO DE PRUEBA (SIN AUTENTICACIÓN)
+// =============================================
+let currentUser = {
+    id: 'test_user_123',
+    username: 'test_user',
+    coins: 100  // Monedas iniciales
+};
+let currentCharacter = null;
+let lastRwTime = 0;
+let lastClaimTime = 0;
 
 // =============================================
-// 2. ELEMENTOS DEL DOM
+// 3. ELEMENTOS DEL DOM
 // =============================================
 const charImage = document.getElementById('char-image');
 const charName = document.getElementById('char-name');
@@ -21,47 +30,21 @@ const btnClaim = document.getElementById('btn-claim');
 const messageP = document.getElementById('message');
 
 // =============================================
-// 3. FUNCIONES DE AUTENTICACIÓN
-// =============================================
-async function loginDemoUser() {
-    // En una app real, usarías supabase.auth.signInWithPassword()
-    // Para pruebas, usamos un usuario fijo que ya existe en profiles
-    const { data, error } = await supabaseClient
-        .from('profiles')
-        .select('*')
-        .eq('username', 'demo_user')  // Asegúrate de que exista
-        .single();
-    
-    if (error) {
-        console.error('Error al obtener perfil:', error);
-        return;
-    }
-    
-    currentUser = data;
-    updateUI();
-    showMessage('✅ Sesión iniciada como: ' + currentUser.username);
-}
-
-// =============================================
-// 4. FUNCIONES DEL GACHA
+// 4. FUNCIONES DEL GACHA (SIN COOLDOWN REAL)
 // =============================================
 
 // Comando #rw: Obtener personaje aleatorio
 async function rwCommand() {
-    if (!currentUser) {
-        showMessage('⚠️ Inicia sesión primero.');
-        return;
-    }
-
-    // Verificar cooldown de 1 minuto
-    const canUse = await checkCooldown('rw');
-    if (!canUse) {
-        showMessage('⏳ Espera 1 minuto para usar #rw.');
+    // Cooldown de 1 minuto en memoria
+    const now = Date.now();
+    if (now - lastRwTime < 60000) {
+        const remaining = Math.ceil((60000 - (now - lastRwTime)) / 1000);
+        showMessage(`⏳ Espera ${remaining} segundos para usar #rw.`);
         return;
     }
 
     try {
-        // Obtener personaje aleatorio de la tabla 'characters'
+        // Obtener personaje aleatorio de Supabase
         const { data, error } = await supabaseClient
             .from('characters')
             .select('*')
@@ -78,9 +61,7 @@ async function rwCommand() {
         displayCharacter(currentCharacter);
         btnClaim.disabled = false;
         showMessage('✨ ¡Personaje disponible! Usa #claim para reclamarlo.');
-
-        // Actualizar cooldown de #rw
-        await updateCooldown('rw');
+        lastRwTime = now;
 
     } catch (error) {
         console.error('Error en #rw:', error);
@@ -90,66 +71,51 @@ async function rwCommand() {
 
 // Comando #claim: Reclamar personaje
 async function claimCommand() {
-    if (!currentUser) {
-        showMessage('⚠️ Inicia sesión primero.');
-        return;
-    }
     if (!currentCharacter) {
         showMessage('⚠️ Usa #rw primero para ver un personaje.');
         return;
     }
 
-    // Verificar cooldown de 5 minutos
-    const canClaim = await checkCooldown('claim');
-    if (!canClaim) {
-        showMessage('⏳ Espera 5 minutos entre reclamos.');
+    // Cooldown de 5 minutos en memoria
+    const now = Date.now();
+    if (now - lastClaimTime < 300000) {
+        const remaining = Math.ceil((300000 - (now - lastClaimTime)) / 1000);
+        showMessage(`⏳ Espera ${remaining} segundos para reclamar.`);
         return;
     }
 
     try {
-        // 1. Verificar si ya tiene el personaje
-        const { data: existing, error: checkError } = await supabaseClient
-            .from('inventory')
-            .select('id')
-            .eq('user_id', currentUser.id)
-            .eq('character_id', currentCharacter.id)
-            .maybeSingle();
-
-        if (checkError) throw checkError;
-        if (existing) {
+        // 1. Verificar si ya tiene el personaje (en memoria local)
+        const userInventory = JSON.parse(localStorage.getItem('user_inventory') || '[]');
+        const hasCharacter = userInventory.some(item => item.character_id === currentCharacter.id);
+        
+        if (hasCharacter) {
             showMessage('⚠️ Ya tienes este personaje.');
-            await rwCommand();  // Mostrar otro
+            await rwCommand();
             return;
         }
 
-        // 2. Añadir al inventario
-        const { error: insertError } = await supabaseClient
-            .from('inventory')
-            .insert({
-                user_id: currentUser.id,
-                character_id: currentCharacter.id
-            });
+        // 2. Añadir al inventario local
+        userInventory.push({
+            character_id: currentCharacter.id,
+            character_name: currentCharacter.name,
+            acquired_at: new Date().toISOString()
+        });
+        localStorage.setItem('user_inventory', JSON.stringify(userInventory));
 
-        if (insertError) throw insertError;
-
-        // 3. Actualizar monedas del usuario
-        const newCoins = (currentUser.coins || 0) + (currentCharacter.value || 0);
-        const { error: updateError } = await supabaseClient
-            .from('profiles')
-            .update({ coins: newCoins })
-            .eq('id', currentUser.id);
-
-        if (updateError) throw updateError;
-
+        // 3. Actualizar monedas (en memoria)
+        const coinsToAdd = currentCharacter.value || 0;
+        currentUser.coins = (currentUser.coins || 0) + coinsToAdd;
+        
+        // Guardar monedas en localStorage
+        localStorage.setItem('user_coins', currentUser.coins);
+        
         // 4. Actualizar UI
-        currentUser.coins = newCoins;
         updateUI();
-        showMessage(`✅ ¡Reclamaste a ${currentCharacter.name}! +${currentCharacter.value} monedas.`);
+        showMessage(`✅ ¡Reclamaste a ${currentCharacter.name}! +${coinsToAdd} monedas.`);
+        lastClaimTime = now;
 
-        // 5. Actualizar cooldown de #claim
-        await updateCooldown('claim');
-
-        // 6. Mostrar nuevo personaje
+        // 5. Mostrar nuevo personaje
         await rwCommand();
 
     } catch (error) {
@@ -159,59 +125,7 @@ async function claimCommand() {
 }
 
 // =============================================
-// 5. FUNCIONES DE COOLDOWNS
-// =============================================
-
-// Verificar si el usuario puede usar rw o claim
-async function checkCooldown(tipo) {
-    const { data, error } = await supabaseClient
-        .from('cooldowns')
-        .select('last_rw, last_claim')
-        .eq('user_id', currentUser.id)
-        .single();
-
-    if (error) {
-        // Si no existe registro, crear uno nuevo
-        await supabaseClient
-            .from('cooldowns')
-            .insert({ user_id: currentUser.id });
-        return true;
-    }
-
-    const now = new Date();
-    let lastTime;
-    let waitSeconds;
-
-    if (tipo === 'rw') {
-        lastTime = new Date(data.last_rw);
-        waitSeconds = 60;  // 1 minuto
-    } else if (tipo === 'claim') {
-        lastTime = new Date(data.last_claim);
-        waitSeconds = 300; // 5 minutos
-    }
-
-    const diffSeconds = (now - lastTime) / 1000;
-    return diffSeconds >= waitSeconds;
-}
-
-// Actualizar el cooldown después de usar rw o claim
-async function updateCooldown(tipo) {
-    const updateData = { user_id: currentUser.id };
-    if (tipo === 'rw') {
-        updateData.last_rw = new Date().toISOString();
-    } else if (tipo === 'claim') {
-        updateData.last_claim = new Date().toISOString();
-    }
-
-    const { error } = await supabaseClient
-        .from('cooldowns')
-        .upsert(updateData);
-
-    if (error) console.error('Error actualizando cooldown:', error);
-}
-
-// =============================================
-// 6. FUNCIONES DE UI
+// 5. FUNCIONES DE UI
 // =============================================
 
 function displayCharacter(character) {
@@ -233,21 +147,78 @@ function showMessage(text) {
 }
 
 // =============================================
+// 6. FUNCIONES DE INVENTARIO (OPCIONAL)
+// =============================================
+
+function showInventory() {
+    const inventory = JSON.parse(localStorage.getItem('user_inventory') || '[]');
+    if (inventory.length === 0) {
+        showMessage('📭 No tienes personajes aún. ¡Usa #rw!');
+        return;
+    }
+    
+    const names = inventory.map(item => item.character_name).join(', ');
+    showMessage(`📦 Tus personajes (${inventory.length}): ${names}`);
+}
+
+// =============================================
 // 7. INICIALIZACIÓN
 // =============================================
 async function init() {
-    await loginDemoUser();
-    await rwCommand();  // Mostrar primer personaje
+    // Cargar datos guardados
+    const savedCoins = localStorage.getItem('user_coins');
+    if (savedCoins !== null) {
+        currentUser.coins = parseInt(savedCoins);
+    }
+    
+    updateUI();
+    showMessage('🎮 ¡Bienvenido al Gacha! Usa #rw para empezar.');
+    
+    // Intentar cargar primer personaje
+    await rwCommand();
+    
+    // Mostrar ayuda con comandos
+    console.log('📝 Comandos disponibles:');
+    console.log('#rw - Obtener personaje aleatorio');
+    console.log('#claim - Reclamar personaje actual');
+    console.log('#inv - Ver tu inventario (en consola)');
 }
 
-// Event listeners
+// =============================================
+// 8. EVENT LISTENERS
+// =============================================
 btnRw.addEventListener('click', rwCommand);
 btnClaim.addEventListener('click', claimCommand);
 
-// Iniciar la página
+// Comando #inv (secreto) - presiona 'I' para ver inventario
+document.addEventListener('keydown', (e) => {
+    if (e.key === 'i' || e.key === 'I') {
+        showInventory();
+    }
+});
+
+// =============================================
+// 9. INICIAR
+// =============================================
 init();
 
-// Mostrar cooldown en tiempo real (opcional)
+// Mostrar cooldown cada segundo
 setInterval(() => {
-    // Aquí podrías actualizar el contador de tiempo restante
+    const now = Date.now();
+    let message = '';
+    
+    const rwRemaining = Math.ceil((60000 - (now - lastRwTime)) / 1000);
+    const claimRemaining = Math.ceil((300000 - (now - lastClaimTime)) / 1000);
+    
+    if (rwRemaining > 0 && rwRemaining < 60) {
+        message += `#rw: ${rwRemaining}s `;
+    }
+    if (claimRemaining > 0 && claimRemaining < 300) {
+        message += `#claim: ${claimRemaining}s`;
+    }
+    
+    if (message && !messageP.textContent.includes('⏳')) {
+        // Mostrar cooldowns en la consola en lugar de en el mensaje principal
+        console.log(`⏳ Cooldowns: ${message}`);
+    }
 }, 1000);
