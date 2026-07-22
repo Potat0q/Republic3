@@ -367,7 +367,7 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (ACTUALIZADAS)
+// 6. FUNCIONES DEL GACHA
 // =============================================
 
 async function loadCharacters() {
@@ -379,7 +379,6 @@ async function loadCharacters() {
         
         if (error) {
             console.error('Error cargando personajes:', error);
-            // Fallback a personajes de ejemplo
             allCharacters = getExampleCharacters();
             showMessage('📝 Usando personajes de ejemplo (error de conexión)');
             return true;
@@ -391,7 +390,7 @@ async function loadCharacters() {
             showMessage(`🎮 ${allCharacters.length} personajes disponibles`);
             return true;
         } else {
-            // Si no hay datos, usar ejemplos
+            // Si la tabla está vacía, usar ejemplos
             allCharacters = getExampleCharacters();
             showMessage('📝 Usando personajes de ejemplo (tabla vacía)');
             return true;
@@ -461,7 +460,7 @@ async function rwCommand() {
     }
 }
 
-// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS
+// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS (CORREGIDO)
 async function claimCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
@@ -492,15 +491,21 @@ async function claimCommand() {
             return;
         }
 
+        // ✅ USAR mal_id (que es INTEGER)
+        const characterId = currentCharacter.mal_id;
+        
         // Verificar si ya tiene el personaje
         const { data: existing, error: checkError } = await supabaseClient
             .from('inventory')
             .select('id')
             .eq('user_id', currentUser.id)
-            .eq('character_id', currentCharacter.mal_id)  // ← USAR mal_id
+            .eq('character_id', characterId)  // ← Ahora es INTEGER
             .maybeSingle();
 
-        if (checkError && checkError.code !== 'PGRST116') throw checkError;
+        if (checkError) {
+            console.error('Error verificando inventario:', checkError);
+            // Si hay error, continuar (puede ser que la tabla no exista)
+        }
         
         if (existing) {
             showMessage('⚠️ Ya tienes este personaje.');
@@ -513,10 +518,14 @@ async function claimCommand() {
             .from('inventory')
             .insert({
                 user_id: currentUser.id,
-                character_id: currentCharacter.mal_id  // ← USAR mal_id
+                character_id: characterId  // ← Ahora es INTEGER
             });
 
-        if (insertError) throw insertError;
+        if (insertError) {
+            console.error('Error insertando en inventario:', insertError);
+            showMessage('⚠️ Error al guardar personaje. Intenta de nuevo.');
+            return;
+        }
 
         // Actualizar monedas
         const newCoins = (currentUser.coins || 0) + coinsToAdd;
@@ -526,7 +535,11 @@ async function claimCommand() {
             .update({ coins: newCoins })
             .eq('id', currentUser.id);
 
-        if (updateError) throw updateError;
+        if (updateError) {
+            console.error('Error actualizando monedas:', updateError);
+            showMessage('⚠️ Error al actualizar monedas.');
+            return;
+        }
 
         currentUser.coins = newCoins;
         updateUI();
@@ -541,7 +554,7 @@ async function claimCommand() {
                     last_claim: new Date().toISOString() 
                 });
         } catch (cooldownError) {
-            console.warn('Error actualizando cooldown de claim:', cooldownError);
+            console.warn('Error actualizando cooldown:', cooldownError);
         }
 
         setTimeout(() => rwCommand(), 500);
@@ -620,7 +633,11 @@ async function showInventory() {
             `)
             .eq('user_id', currentUser.id);
 
-        if (error) throw error;
+        if (error) {
+            console.error('Error consultando inventario:', error);
+            showMessage('❌ Error al mostrar inventario');
+            return;
+        }
 
         if (!data || data.length === 0) {
             showMessage('📭 No tienes personajes aún. ¡Usa #rw!');
