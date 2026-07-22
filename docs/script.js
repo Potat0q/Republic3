@@ -192,7 +192,8 @@ async function loginWithEmail(email, password) {
                     id: authData.user.id,
                     username: username,
                     email: email,
-                    coins: 100
+                    coins: 100,
+                    is_guest: false
                 })
                 .select()
                 .single();
@@ -293,7 +294,8 @@ async function registerUser(username, email, password) {
                 id: authData.user.id,
                 username: username,
                 email: email,
-                coins: 100
+                coins: 100,
+                is_guest: false
             })
             .select()
             .single();
@@ -377,6 +379,7 @@ async function loadCharacters() {
         
         if (data && data.length > 0) {
             allCharacters = data;
+            console.log(`✅ ${allCharacters.length} personajes cargados`);
         } else {
             allCharacters = [
                 { id: '1', name: 'Pikachu', rarity: 'Legendario', value: 1000, image_url: '' },
@@ -387,8 +390,6 @@ async function loadCharacters() {
             ];
             showMessage('📝 Usando personajes de ejemplo');
         }
-        
-        console.log(`✅ ${allCharacters.length} personajes cargados`);
         return true;
         
     } catch (error) {
