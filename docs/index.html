@@ -13,19 +13,20 @@
             <p class="subtitle">¡Consigue personajes y colecciónalos!</p>
         </div>
 
-        <!-- Info de usuario -->
-        <div class="user-info" id="userInfo">
-            <div class="user-left">
-                <span class="user-icon">👤</span>
-                <span class="username" id="displayUsername">Invitado</span>
-                <span class="user-badge" id="userBadge" style="display:none;">👑 Registrado</span>
-                <span class="user-badge guest-badge" id="guestBadge" style="display:none;">🎮 Invitado</span>
-            </div>
-            <div class="user-right">
-                <span class="coins">🪙 <span id="user-coins">0</span></span>
-                <button class="btn-logout" id="btnLogout" style="display:none;">🚪 Salir</button>
-            </div>
-        </div>
+<div class="user-info" id="userInfo">
+    <div class="user-left">
+        <span class="user-icon">👤</span>
+        <span class="username" id="displayUsername">Invitado</span>
+        <span class="user-badge" id="userBadge" style="display:none;">👑 Registrado</span>
+        <span class="user-badge guest-badge" id="guestBadge" style="display:none;">🎮 Invitado</span>
+        <!-- 👇 AGREGA ESTE BOTÓN AQUÍ -->
+        <button id="btnAdmin" style="display: none;">👑 Admin</button>
+    </div>
+    <div class="user-right">
+        <span class="coins">🪙 <span id="user-coins">0</span></span>
+        <button class="btn-logout" id="btnLogout" style="display:none;">🚪 Salir</button>
+    </div>
+</div>
 
         <!-- Personaje -->
         <div class="character-card" id="characterCard">
