@@ -10,7 +10,7 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 // =============================================
 let currentUser = null;
 let currentCharacter = null;
-let charactersByRarity = {}; // Caché organizado por rareza
+let charactersCount = 0; // Solo almacenamos el total, no todos los personajes
 let lastRwTime = 0;
 let lastClaimTime = 0;
 let isGuest = false;
@@ -341,7 +341,7 @@ async function logout() {
         currentUser = null;
         isGuest = false;
         currentCharacter = null;
-        charactersByRarity = {};
+        charactersCount = 0;
         
         displayUsername.textContent = 'Invitado';
         userCoinsSpan.textContent = '0';
@@ -367,121 +367,54 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (CON SISTEMA DE RAREZAS)
+// 6. FUNCIONES DEL GACHA (OPTIMIZADAS)
 // =============================================
 
+// ✅ Ya no cargamos todos los personajes, solo contamos cuántos hay
 async function loadCharacters() {
     try {
-        // Cargar todos los personajes y agruparlos por rareza
-        const { data, error } = await supabaseClient
+        const { count, error } = await supabaseClient
             .from('characters')
-            .select('*');
+            .select('*', { count: 'exact', head: true });
         
         if (error) {
-            console.error('Error cargando personajes:', error);
-            // Usar personajes de ejemplo en caso de error
-            charactersByRarity = getExampleCharactersByRarity();
+            console.error('Error contando personajes:', error);
+            charactersCount = 5; // Fallback a personajes de ejemplo
             showMessage('📝 Usando personajes de ejemplo (error de conexión)');
             return true;
         }
         
-        if (data && data.length > 0) {
-            // Agrupar por rareza
-            charactersByRarity = {};
-            data.forEach(char => {
-                const rarity = char.rarity || 'Comun';
-                if (!charactersByRarity[rarity]) {
-                    charactersByRarity[rarity] = [];
-                }
-                charactersByRarity[rarity].push(char);
-            });
-            
-            const total = data.length;
-            console.log(`✅ ${total} personajes cargados y agrupados por rareza`);
-            console.log('📊 Distribución:', Object.keys(charactersByRarity).map(r => `${r}: ${charactersByRarity[r].length}`).join(', '));
-            showMessage(`🎮 ${total} personajes disponibles`);
-            return true;
-        } else {
-            // Si la tabla está vacía, usar ejemplos
-            charactersByRarity = getExampleCharactersByRarity();
-            showMessage('📝 Usando personajes de ejemplo (tabla vacía)');
-            return true;
-        }
+        charactersCount = count;
+        console.log(`✅ ${charactersCount} personajes disponibles en la base de datos`);
+        showMessage(`🎮 ${charactersCount} personajes disponibles`);
+        return true;
         
     } catch (error) {
         console.error('Error en loadCharacters:', error);
-        charactersByRarity = getExampleCharactersByRarity();
-        showMessage('📝 Usando personajes de ejemplo (error)');
+        charactersCount = 5;
         return true;
     }
 }
 
-function getExampleCharactersByRarity() {
-    return {
-        'Mitico': [
-            { mal_id: 4, name: 'Mewtwo', rarity: 'Mitico', value: 2000, image_jpg_url: '' },
-            { mal_id: 6, name: 'Goku', rarity: 'Mitico', value: 2500, image_jpg_url: '' }
-        ],
-        'Legendario': [
-            { mal_id: 1, name: 'Pikachu', rarity: 'Legendario', value: 1000, image_jpg_url: '' },
-            { mal_id: 7, name: 'Naruto', rarity: 'Legendario', value: 1200, image_jpg_url: '' }
-        ],
-        'Epico': [
-            { mal_id: 2, name: 'Charizard', rarity: 'Epico', value: 500, image_jpg_url: '' },
-            { mal_id: 8, name: 'Luffy', rarity: 'Epico', value: 450, image_jpg_url: '' }
-        ],
-        'Raro': [
-            { mal_id: 5, name: 'Eevee', rarity: 'Raro', value: 300, image_jpg_url: '' },
-            { mal_id: 9, name: 'Tanjiro', rarity: 'Raro', value: 300, image_jpg_url: '' }
-        ],
-        'Poco Comun': [
-            { mal_id: 10, name: 'Gojo', rarity: 'Poco Comun', value: 200, image_jpg_url: '' }
-        ],
-        'Comun': [
-            { mal_id: 3, name: 'Bulbasaur', rarity: 'Comun', value: 100, image_jpg_url: '' },
-            { mal_id: 11, name: 'Kirito', rarity: 'Comun', value: 100, image_jpg_url: '' }
-        ]
-    };
+// ✅ Obtener personaje aleatorio directamente desde la base de datos
+async function getRandomCharacter() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('characters')
+            .select('*')
+            .order('random()')
+            .limit(1);
+        
+        if (error) throw error;
+        if (!data || data.length === 0) return null;
+        return data[0];
+    } catch (error) {
+        console.error('Error obteniendo personaje aleatorio:', error);
+        return null;
+    }
 }
 
-function getRandomCharacterFromCache() {
-    // 1. Definir las probabilidades de cada rareza
-    const rarityProbability = {
-        'Mitico': 0.01,      // 1%
-        'Exotico': 0.02,     // 2%
-        'Legendario': 0.05,  // 5%
-        'Epico': 0.12,       // 12%
-        'Raro': 0.20,        // 20%
-        'Poco Comun': 0.25,  // 25%
-        'Comun': 0.35        // 35%
-    };
-
-    // 2. Seleccionar una rareza según las probabilidades
-    const rand = Math.random();
-    let cumulative = 0;
-    let selectedRarity = 'Comun';
-
-    for (const [rarity, prob] of Object.entries(rarityProbability)) {
-        cumulative += prob;
-        if (rand <= cumulative) {
-            selectedRarity = rarity;
-            break;
-        }
-    }
-
-    // 3. Obtener un personaje aleatorio de esa rareza
-    const characters = charactersByRarity[selectedRarity] || [];
-    if (characters.length === 0) {
-        // Fallback: si no hay personajes de esa rareza, obtener de cualquier rareza
-        const allCharacters = Object.values(charactersByRarity).flat();
-        if (allCharacters.length === 0) return null;
-        return allCharacters[Math.floor(Math.random() * allCharacters.length)];
-    }
-    
-    return characters[Math.floor(Math.random() * characters.length)];
-}
-
-// ⚡ rwCommand: SIN COOLDOWN (optimizado)
+// ⚡ rwCommand: SIN COOLDOWN
 async function rwCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
@@ -489,7 +422,7 @@ async function rwCommand() {
     }
 
     try {
-        const character = getRandomCharacterFromCache();
+        const character = await getRandomCharacter();
         
         if (!character) {
             showMessage('❌ No hay personajes disponibles.');
@@ -521,7 +454,7 @@ async function rwCommand() {
     }
 }
 
-// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS (CORREGIDO)
+// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS
 async function claimCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
