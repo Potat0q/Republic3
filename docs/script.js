@@ -19,6 +19,10 @@ let isGuest = false;
 const COOLDOWN_RW = 3;        // 3 segundos entre #rw
 const COOLDOWN_CLAIM = 30;    // 30 segundos entre #claim
 
+// 👑 ID del administrador (reemplaza con tu UUID de la tabla profiles)
+// Puedes obtenerlo desde la tabla profiles en Supabase
+const ADMIN_ID = '8f2707ee-26e2-4ca9-87d2-7ebe3b03589a'; // ← REEMPLAZA CON TU ID REAL
+
 // =============================================
 // 3. ELEMENTOS DEL DOM
 // =============================================
@@ -705,12 +709,12 @@ async function showInventory() {
 // 9. FUNCIONES DE ADMINISTRADOR
 // =============================================
 
-// Verificar si el usuario es administrador
+// Verificar si el usuario es administrador (por ID)
 function isAdmin() {
     if (!currentUser) return false;
-    // Cambia esto por tu correo
-    const adminEmails = ['maxpotato001@gmail.com'];
-    return adminEmails.includes(currentUser.email);
+    // Reemplaza ADMIN_ID con tu UUID real de la tabla profiles
+    const adminIds = [ADMIN_ID];
+    return adminIds.includes(currentUser.id);
 }
 
 // Mostrar/Ocultar botón de admin
