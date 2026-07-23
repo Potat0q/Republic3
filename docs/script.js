@@ -367,7 +367,7 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (ACTUALIZADAS)
+// 6. FUNCIONES DEL GACHA (CORREGIDAS)
 // =============================================
 
 async function loadCharacters() {
@@ -395,72 +395,49 @@ async function loadCharacters() {
     }
 }
 
-// ✅ Función con sistema de rarezas por probabilidad
+// ✅ Función que usa RPC para obtener personaje aleatorio
 async function getRandomCharacter() {
     try {
-        // 1. Definir las probabilidades de cada rareza
-        const rarityProbability = {
-            'Mitico': 0.01,      // 1% - Los más raros
-            'Exotico': 0.02,     // 2%
-            'Legendario': 0.05,  // 5%
-            'Epico': 0.10,       // 10%
-            'Raro': 0.15,        // 15%
-            'Poco Comun': 0.25,  // 25%
-            'Comun': 0.42        // 42% - La mayoría son comunes
-        };
-
-        // 2. Seleccionar una rareza según las probabilidades
-        const rand = Math.random();
-        let cumulative = 0;
-        let selectedRarity = 'Comun';
-
-        for (const [rarity, prob] of Object.entries(rarityProbability)) {
-            cumulative += prob;
-            if (rand <= cumulative) {
-                selectedRarity = rarity;
-                break;
-            }
-        }
-
-        // 3. Obtener un personaje aleatorio de esa rareza
+        // Llamar a la función RPC que creamos en Supabase
         const { data, error } = await supabaseClient
-            .from('characters')
-            .select('*')
-            .eq('rarity', selectedRarity)
-            .order('random()')
-            .limit(1);
-
+            .rpc('get_random_character');
+        
         if (error) {
-            console.error('Error en random() por rareza:', error);
+            console.error('Error en RPC:', error);
+            // Fallback: usar range si RPC falla
             return await getRandomCharacterFallback();
         }
-
-        if (data && data.length > 0) {
-            return data[0];
-        }
-
-        // Si no hay personajes de esa rareza, obtener uno aleatorio cualquiera
-        return await getRandomCharacterFallback();
-
+        
+        if (!data || data.length === 0) return null;
+        return data[0];
     } catch (error) {
         console.error('Error obteniendo personaje aleatorio:', error);
         return await getRandomCharacterFallback();
     }
 }
 
-// Fallback: si la selección por rareza falla
+// ✅ Fallback: usar range() si RPC falla
 async function getRandomCharacterFallback() {
     try {
+        // Si no tenemos el total, obtenerlo
+        if (!charactersCount || charactersCount === 0) {
+            const { count, error } = await supabaseClient
+                .from('characters')
+                .select('*', { count: 'exact', head: true });
+            
+            if (error) throw error;
+            charactersCount = count;
+        }
+
+        // Generar offset aleatorio cada vez
+        const randomOffset = Math.floor(Math.random() * charactersCount);
+        
         const { data, error } = await supabaseClient
             .from('characters')
             .select('*')
-            .order('random()')
-            .limit(1);
+            .range(randomOffset, randomOffset);
         
-        if (error) {
-            console.error('Error en fallback:', error);
-            return null;
-        }
+        if (error) throw error;
         if (!data || data.length === 0) return null;
         return data[0];
     } catch (error) {
@@ -671,7 +648,7 @@ function showMessage(text) {
 }
 
 // =============================================
-// 8. FUNCIONES DE INVENTARIO (ACTUALIZADAS)
+// 8. FUNCIONES DE INVENTARIO
 // =============================================
 
 async function showInventory() {
