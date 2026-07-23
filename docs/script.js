@@ -10,7 +10,7 @@ const supabaseClient = window.supabase.createClient(supabaseUrl, supabaseKey);
 // =============================================
 let currentUser = null;
 let currentCharacter = null;
-let charactersCount = 0; // Solo almacenamos el total, no todos los personajes
+let charactersCount = 0;
 let lastRwTime = 0;
 let lastClaimTime = 0;
 let isGuest = false;
@@ -367,10 +367,9 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (OPTIMIZADAS)
+// 6. FUNCIONES DEL GACHA (CORREGIDAS)
 // =============================================
 
-// ✅ Ya no cargamos todos los personajes, solo contamos cuántos hay
 async function loadCharacters() {
     try {
         const { count, error } = await supabaseClient
@@ -379,7 +378,7 @@ async function loadCharacters() {
         
         if (error) {
             console.error('Error contando personajes:', error);
-            charactersCount = 5; // Fallback a personajes de ejemplo
+            charactersCount = 5;
             showMessage('📝 Usando personajes de ejemplo (error de conexión)');
             return true;
         }
@@ -396,13 +395,27 @@ async function loadCharacters() {
     }
 }
 
-// ✅ Obtener personaje aleatorio directamente desde la base de datos
+// ✅ Función optimizada para obtener personaje aleatorio usando range()
 async function getRandomCharacter() {
     try {
+        // Si no tenemos el total, obtenerlo
+        if (!charactersCount || charactersCount === 0) {
+            const { count, error } = await supabaseClient
+                .from('characters')
+                .select('*', { count: 'exact', head: true });
+            
+            if (error) throw error;
+            charactersCount = count;
+        }
+
+        // Generar un offset aleatorio
+        const randomOffset = Math.floor(Math.random() * charactersCount);
+        
+        // Obtener un personaje usando range()
         const { data, error } = await supabaseClient
             .from('characters')
             .select('*')
-            .order('random()')
+            .range(randomOffset, randomOffset)
             .limit(1);
         
         if (error) throw error;
