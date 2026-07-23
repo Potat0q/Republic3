@@ -367,7 +367,7 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (CORREGIDAS)
+// 6. FUNCIONES DEL GACHA (OPTIMIZADAS)
 // =============================================
 
 async function loadCharacters() {
@@ -395,29 +395,8 @@ async function loadCharacters() {
     }
 }
 
-// ✅ Función que usa RPC para obtener personaje aleatorio
+// ✅ Función optimizada sin RPC
 async function getRandomCharacter() {
-    try {
-        // Llamar a la función RPC que creamos en Supabase
-        const { data, error } = await supabaseClient
-            .rpc('get_random_character');
-        
-        if (error) {
-            console.error('Error en RPC:', error);
-            // Fallback: usar range si RPC falla
-            return await getRandomCharacterFallback();
-        }
-        
-        if (!data || data.length === 0) return null;
-        return data[0];
-    } catch (error) {
-        console.error('Error obteniendo personaje aleatorio:', error);
-        return await getRandomCharacterFallback();
-    }
-}
-
-// ✅ Fallback: usar range() si RPC falla
-async function getRandomCharacterFallback() {
     try {
         // Si no tenemos el total, obtenerlo
         if (!charactersCount || charactersCount === 0) {
@@ -441,7 +420,7 @@ async function getRandomCharacterFallback() {
         if (!data || data.length === 0) return null;
         return data[0];
     } catch (error) {
-        console.error('Error en fallback:', error);
+        console.error('Error obteniendo personaje aleatorio:', error);
         return null;
     }
 }
