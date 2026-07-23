@@ -367,7 +367,7 @@ async function logout() {
 }
 
 // =============================================
-// 6. FUNCIONES DEL GACHA (CORREGIDAS)
+// 6. FUNCIONES DEL GACHA (ACTUALIZADAS)
 // =============================================
 
 async function loadCharacters() {
@@ -395,34 +395,76 @@ async function loadCharacters() {
     }
 }
 
-// ✅ Función optimizada para obtener personaje aleatorio usando range()
+// ✅ Función con sistema de rarezas por probabilidad
 async function getRandomCharacter() {
     try {
-        // Si no tenemos el total, obtenerlo
-        if (!charactersCount || charactersCount === 0) {
-            const { count, error } = await supabaseClient
-                .from('characters')
-                .select('*', { count: 'exact', head: true });
-            
-            if (error) throw error;
-            charactersCount = count;
+        // 1. Definir las probabilidades de cada rareza
+        const rarityProbability = {
+            'Mitico': 0.01,      // 1% - Los más raros
+            'Exotico': 0.02,     // 2%
+            'Legendario': 0.05,  // 5%
+            'Epico': 0.10,       // 10%
+            'Raro': 0.15,        // 15%
+            'Poco Comun': 0.25,  // 25%
+            'Comun': 0.42        // 42% - La mayoría son comunes
+        };
+
+        // 2. Seleccionar una rareza según las probabilidades
+        const rand = Math.random();
+        let cumulative = 0;
+        let selectedRarity = 'Comun';
+
+        for (const [rarity, prob] of Object.entries(rarityProbability)) {
+            cumulative += prob;
+            if (rand <= cumulative) {
+                selectedRarity = rarity;
+                break;
+            }
         }
 
-        // Generar un offset aleatorio
-        const randomOffset = Math.floor(Math.random() * charactersCount);
-        
-        // Obtener un personaje usando range()
+        // 3. Obtener un personaje aleatorio de esa rareza
         const { data, error } = await supabaseClient
             .from('characters')
             .select('*')
-            .range(randomOffset, randomOffset)
+            .eq('rarity', selectedRarity)
+            .order('random()')
+            .limit(1);
+
+        if (error) {
+            console.error('Error en random() por rareza:', error);
+            return await getRandomCharacterFallback();
+        }
+
+        if (data && data.length > 0) {
+            return data[0];
+        }
+
+        // Si no hay personajes de esa rareza, obtener uno aleatorio cualquiera
+        return await getRandomCharacterFallback();
+
+    } catch (error) {
+        console.error('Error obteniendo personaje aleatorio:', error);
+        return await getRandomCharacterFallback();
+    }
+}
+
+// Fallback: si la selección por rareza falla
+async function getRandomCharacterFallback() {
+    try {
+        const { data, error } = await supabaseClient
+            .from('characters')
+            .select('*')
+            .order('random()')
             .limit(1);
         
-        if (error) throw error;
+        if (error) {
+            console.error('Error en fallback:', error);
+            return null;
+        }
         if (!data || data.length === 0) return null;
         return data[0];
     } catch (error) {
-        console.error('Error obteniendo personaje aleatorio:', error);
+        console.error('Error en fallback:', error);
         return null;
     }
 }
@@ -467,7 +509,7 @@ async function rwCommand() {
     }
 }
 
-// ⚡ claimCommand: COOLDOWN DE 30 SEGUNDOS
+// ⚡ claimCommand: CON VERIFICACIÓN GLOBAL
 async function claimCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
@@ -500,23 +542,44 @@ async function claimCommand() {
 
         const characterId = currentCharacter.mal_id;
         
-        const { data: existing, error: checkError } = await supabaseClient
+        // 🔥 VERIFICAR SI ALGUIEN MÁS YA LO RECLAMÓ
+        const { data: existingGlobal, error: checkGlobalError } = await supabaseClient
+            .from('inventory')
+            .select('user_id, profiles!inner(username)')
+            .eq('character_id', characterId)
+            .maybeSingle();
+
+        if (checkGlobalError) {
+            console.error('Error verificando disponibilidad global:', checkGlobalError);
+        }
+
+        if (existingGlobal) {
+            const ownerName = existingGlobal.profiles?.username || 'otro usuario';
+            showMessage(`⚠️ Este personaje ya fue reclamado por ${ownerName}.`);
+            // Mostrar otro personaje automáticamente
+            await rwCommand();
+            return;
+        }
+
+        // Verificar si el usuario actual ya lo tiene
+        const { data: existingUser, error: checkUserError } = await supabaseClient
             .from('inventory')
             .select('id')
             .eq('user_id', currentUser.id)
             .eq('character_id', characterId)
             .maybeSingle();
 
-        if (checkError) {
-            console.error('Error verificando inventario:', checkError);
+        if (checkUserError) {
+            console.error('Error verificando inventario del usuario:', checkUserError);
         }
         
-        if (existing) {
+        if (existingUser) {
             showMessage('⚠️ Ya tienes este personaje.');
             await rwCommand();
             return;
         }
 
+        // Insertar en inventario
         const { error: insertError } = await supabaseClient
             .from('inventory')
             .insert({
@@ -530,6 +593,7 @@ async function claimCommand() {
             return;
         }
 
+        // Actualizar monedas
         const newCoins = (currentUser.coins || 0) + coinsToAdd;
         
         const { error: updateError } = await supabaseClient
@@ -607,7 +671,7 @@ function showMessage(text) {
 }
 
 // =============================================
-// 8. FUNCIONES DE INVENTARIO
+// 8. FUNCIONES DE INVENTARIO (ACTUALIZADAS)
 // =============================================
 
 async function showInventory() {
@@ -622,32 +686,40 @@ async function showInventory() {
     }
 
     try {
-        const { data, error } = await supabaseClient
+        // Obtener los IDs del inventario
+        const { data: inventoryData, error: invError } = await supabaseClient
             .from('inventory')
-            .select(`
-                character_id,
-                characters!inner (
-                    name,
-                    rarity,
-                    value
-                )
-            `)
+            .select('character_id')
             .eq('user_id', currentUser.id);
 
-        if (error) {
-            console.error('Error consultando inventario:', error);
+        if (invError) {
+            console.error('Error consultando inventario:', invError);
             showMessage('❌ Error al mostrar inventario');
             return;
         }
 
-        if (!data || data.length === 0) {
+        if (!inventoryData || inventoryData.length === 0) {
             showMessage('📭 No tienes personajes aún. ¡Usa #rw!');
             return;
         }
 
-        const names = data.map(item => item.characters.name).join(', ');
-        showMessage(`📦 Tus personajes (${data.length}): ${names}`);
-        console.log('📦 Inventario completo:', data);
+        // Obtener los personajes por sus IDs
+        const characterIds = inventoryData.map(item => item.character_id);
+        
+        const { data: charactersData, error: charError } = await supabaseClient
+            .from('characters')
+            .select('name, rarity, value, mal_id')
+            .in('mal_id', characterIds);
+
+        if (charError) {
+            console.error('Error consultando personajes:', charError);
+            showMessage('❌ Error al mostrar inventario');
+            return;
+        }
+
+        const names = charactersData.map(char => char.name).join(', ');
+        showMessage(`📦 Tus personajes (${charactersData.length}): ${names}`);
+        console.log('📦 Inventario completo:', charactersData);
     } catch (error) {
         console.error('Error mostrando inventario:', error);
         showMessage('❌ Error al mostrar inventario');
