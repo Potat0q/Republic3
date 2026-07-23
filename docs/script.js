@@ -15,6 +15,10 @@ let lastRwTime = 0;
 let lastClaimTime = 0;
 let isGuest = false;
 
+// ⏱️ TIEMPOS DE COOLDOWN (en segundos)
+const COOLDOWN_RW = 3;        // 3 segundos entre #rw
+const COOLDOWN_CLAIM = 30;    // 30 segundos entre #claim
+
 // =============================================
 // 3. ELEMENTOS DEL DOM
 // =============================================
@@ -35,6 +39,7 @@ const btnLogin = document.getElementById('btnLogin');
 const btnRegister = document.getElementById('btnRegister');
 const btnLogout = document.getElementById('btnLogout');
 const characterCard = document.getElementById('characterCard');
+const btnAdmin = document.getElementById('btnAdmin');
 
 // Modales
 const loginModal = document.getElementById('loginModal');
@@ -425,10 +430,19 @@ async function getRandomCharacter() {
     }
 }
 
-// ⚡ rwCommand: SIN COOLDOWN
+// ⚡ rwCommand: CON COOLDOWN
 async function rwCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
+        return;
+    }
+
+    // Verificar cooldown
+    const now = Date.now();
+    const timeSinceRw = (now - lastRwTime) / 1000;
+    if (timeSinceRw < COOLDOWN_RW) {
+        const remaining = Math.ceil(COOLDOWN_RW - timeSinceRw);
+        showMessage(`⏳ Espera ${remaining} segundos para usar #rw.`);
         return;
     }
 
@@ -445,6 +459,7 @@ async function rwCommand() {
         btnClaim.disabled = false;
         characterCard.classList.add('has-character');
         showMessage('✨ ¡Personaje disponible! Usa #claim para reclamarlo.');
+        lastRwTime = now;
 
         if (!isGuest && currentUser) {
             try {
@@ -465,7 +480,7 @@ async function rwCommand() {
     }
 }
 
-// ⚡ claimCommand: CON VERIFICACIÓN GLOBAL
+// ⚡ claimCommand: CON COOLDOWN Y VERIFICACIÓN GLOBAL
 async function claimCommand() {
     if (!currentUser) {
         showMessage('⚠️ Inicia sesión o juega como invitado primero.');
@@ -477,9 +492,11 @@ async function claimCommand() {
         return;
     }
 
+    // Verificar cooldown de claim
     const now = Date.now();
-    if (now - lastClaimTime < 30000) {  // 30 segundos
-        const remaining = Math.ceil((30000 - (now - lastClaimTime)) / 1000);
+    const timeSinceClaim = (now - lastClaimTime) / 1000;
+    if (timeSinceClaim < COOLDOWN_CLAIM) {
+        const remaining = Math.ceil(COOLDOWN_CLAIM - timeSinceClaim);
         showMessage(`⏳ Espera ${remaining} segundos para reclamar.`);
         return;
     }
@@ -615,6 +632,8 @@ function updateUI() {
     if (currentUser) {
         displayUsername.textContent = currentUser.username;
         userCoinsSpan.textContent = currentUser.coins || 0;
+        // Mostrar el botón de admin si es administrador
+        updateAdminButton();
     } else {
         displayUsername.textContent = 'Invitado';
         userCoinsSpan.textContent = '0';
@@ -683,7 +702,167 @@ async function showInventory() {
 }
 
 // =============================================
-// 9. INICIALIZACIÓN
+// 9. FUNCIONES DE ADMINISTRADOR
+// =============================================
+
+// Verificar si el usuario es administrador
+function isAdmin() {
+    if (!currentUser) return false;
+    // Cambia esto por tu correo
+    const adminEmails = ['maxpotato001@gmail.com'];
+    return adminEmails.includes(currentUser.email);
+}
+
+// Mostrar/Ocultar botón de admin
+function updateAdminButton() {
+    const btnAdmin = document.getElementById('btnAdmin');
+    if (btnAdmin) {
+        btnAdmin.style.display = isAdmin() ? 'inline-block' : 'none';
+    }
+}
+
+// Panel de administrador
+async function openAdminPanel() {
+    if (!isAdmin()) {
+        showMessage('⛔ No tienes permisos de administrador.');
+        return;
+    }
+
+    showMessage('👑 Panel de administrador abierto en consola (F12)');
+    console.log('👑 ========== PANEL DE ADMINISTRADOR ==========');
+    console.log('1. Ver todos los usuarios:');
+    console.log('   await adminListUsers();');
+    console.log('2. Ver inventario de un usuario:');
+    console.log('   await adminViewInventory("user_id");');
+    console.log('3. Eliminar un personaje del inventario:');
+    console.log('   await adminRemoveCharacter("user_id", "character_id");');
+    console.log('4. Eliminar todo el inventario de un usuario:');
+    console.log('   await adminClearInventory("user_id");');
+    console.log('5. Ver personajes reclamados globalmente:');
+    console.log('   await adminGlobalInventory();');
+    console.log('6. Eliminar un personaje GLOBALMENTE:');
+    console.log('   await adminDeleteCharacterGlobally("character_id");');
+    console.log('7. Buscar un usuario por nombre:');
+    console.log('   await adminFindUser("nombre");');
+}
+
+// =============================================
+// FUNCIONES DE ADMINISTRADOR
+// =============================================
+
+// 1. Listar todos los usuarios
+async function adminListUsers() {
+    if (!isAdmin()) return;
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id, username, email, coins');
+    if (error) {
+        console.error('Error:', error);
+        return;
+    }
+    console.table(data);
+    return data;
+}
+
+// 2. Ver inventario de un usuario
+async function adminViewInventory(userId) {
+    if (!isAdmin()) return;
+    const { data, error } = await supabaseClient
+        .from('inventory')
+        .select('character_id, characters(name, rarity, value)')
+        .eq('user_id', userId);
+    if (error) {
+        console.error('Error:', error);
+        return;
+    }
+    console.table(data);
+    return data;
+}
+
+// 3. Eliminar un personaje del inventario de un usuario
+async function adminRemoveCharacter(userId, characterId) {
+    if (!isAdmin()) return;
+    const { error } = await supabaseClient
+        .from('inventory')
+        .delete()
+        .eq('user_id', userId)
+        .eq('character_id', characterId);
+    if (error) {
+        console.error('Error al eliminar:', error);
+        showMessage('❌ Error al eliminar personaje.');
+    } else {
+        showMessage(`✅ Personaje ${characterId} eliminado del usuario.`);
+        console.log(`✅ Personaje ${characterId} eliminado.`);
+    }
+}
+
+// 4. Eliminar todo el inventario de un usuario
+async function adminClearInventory(userId) {
+    if (!isAdmin()) return;
+    const confirmDelete = confirm(`¿Eliminar TODO el inventario del usuario ${userId}?`);
+    if (!confirmDelete) return;
+    const { error } = await supabaseClient
+        .from('inventory')
+        .delete()
+        .eq('user_id', userId);
+    if (error) {
+        console.error('Error al eliminar inventario:', error);
+        showMessage('❌ Error al eliminar inventario.');
+    } else {
+        showMessage(`✅ Inventario del usuario eliminado.`);
+        console.log(`✅ Inventario del usuario ${userId} eliminado.`);
+    }
+}
+
+// 5. Ver todos los personajes reclamados globalmente
+async function adminGlobalInventory() {
+    if (!isAdmin()) return;
+    const { data, error } = await supabaseClient
+        .from('inventory')
+        .select('user_id, profiles(username), character_id, characters(name, rarity)');
+    if (error) {
+        console.error('Error:', error);
+        return;
+    }
+    console.table(data);
+    return data;
+}
+
+// 6. Eliminar un personaje GLOBALMENTE (de todos los usuarios)
+async function adminDeleteCharacterGlobally(characterId) {
+    if (!isAdmin()) return;
+    const confirmDelete = confirm(`¿Eliminar el personaje ${characterId} de TODOS los usuarios?`);
+    if (!confirmDelete) return;
+    const { error } = await supabaseClient
+        .from('inventory')
+        .delete()
+        .eq('character_id', characterId);
+    if (error) {
+        console.error('Error al eliminar personaje globalmente:', error);
+        showMessage('❌ Error al eliminar personaje globalmente.');
+    } else {
+        showMessage(`✅ Personaje ${characterId} eliminado globalmente.`);
+        console.log(`✅ Personaje ${characterId} eliminado de TODOS los usuarios.`);
+    }
+}
+
+// 7. Obtener el user_id de un usuario por su nombre
+async function adminFindUser(username) {
+    if (!isAdmin()) return;
+    const { data, error } = await supabaseClient
+        .from('profiles')
+        .select('id, username, email')
+        .ilike('username', `%${username}%`);
+    if (error) {
+        console.error('Error:', error);
+        return;
+    }
+    console.table(data);
+    return data;
+}
+
+// =============================================
+// 10. INICIALIZACIÓN
 // =============================================
 async function init() {
     try {
@@ -718,13 +897,18 @@ async function init() {
 }
 
 // =============================================
-// 10. EVENT LISTENERS
+// 11. EVENT LISTENERS
 // =============================================
 
 btnRw.addEventListener('click', rwCommand);
 btnClaim.addEventListener('click', claimCommand);
 btnGuest.addEventListener('click', loginAsGuest);
 btnLogout.addEventListener('click', logout);
+
+// Botón de administrador
+if (btnAdmin) {
+    btnAdmin.addEventListener('click', openAdminPanel);
+}
 
 loginForm.addEventListener('submit', (e) => {
     e.preventDefault();
@@ -748,6 +932,6 @@ document.addEventListener('keydown', (e) => {
 });
 
 // =============================================
-// 11. INICIAR
+// 12. INICIAR
 // =============================================
 init();
