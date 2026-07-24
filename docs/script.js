@@ -22,6 +22,24 @@ const COOLDOWN_CLAIM = 30;    // 30 segundos entre #claim
 // =============================================
 // 3. ELEMENTOS DEL DOM
 // =============================================
+const menuPrincipal = document.getElementById('menuPrincipal');
+const gachaApp = document.getElementById('gachaApp');
+
+// Elementos del menú
+const loginUsername = document.getElementById('loginUsername');
+const loginPassword = document.getElementById('loginPassword');
+const registerUsername = document.getElementById('registerUsername');
+const registerEmail = document.getElementById('registerEmail');
+const registerPassword = document.getElementById('registerPassword');
+const btnLoginMenu = document.getElementById('btnLoginMenu');
+const btnRegisterMenu = document.getElementById('btnRegisterMenu');
+const btnGuestMenu = document.getElementById('btnGuestMenu');
+const switchToRegisterMenu = document.getElementById('switchToRegisterMenu');
+const switchToLoginMenu = document.getElementById('switchToLoginMenu');
+const loginFormContainer = document.getElementById('loginFormContainer');
+const registerFormContainer = document.getElementById('registerFormContainer');
+
+// Elementos del gacha
 const charImage = document.getElementById('char-image');
 const charPlaceholder = document.getElementById('charPlaceholder');
 const charName = document.getElementById('char-name');
@@ -34,72 +52,39 @@ const guestBadge = document.getElementById('guestBadge');
 const btnRw = document.getElementById('btn-rw');
 const btnClaim = document.getElementById('btn-claim');
 const messageP = document.getElementById('message');
-const btnGuest = document.getElementById('btnGuest');
-const btnLogin = document.getElementById('btnLogin');
-const btnRegister = document.getElementById('btnRegister');
 const btnLogout = document.getElementById('btnLogout');
 const characterCard = document.getElementById('characterCard');
 
-// Modales
-const loginModal = document.getElementById('loginModal');
-const registerModal = document.getElementById('registerModal');
-const loginForm = document.getElementById('loginForm');
-const registerForm = document.getElementById('registerForm');
-const loginError = document.getElementById('loginError');
-const registerError = document.getElementById('registerError');
-const closeLoginModal = document.getElementById('closeLoginModal');
-const closeRegisterModal = document.getElementById('closeRegisterModal');
-const switchToRegister = document.getElementById('switchToRegister');
-const switchToLogin = document.getElementById('switchToLogin');
-
 // =============================================
-// 4. FUNCIONES DE LOS MODALES
+// 4. FUNCIONES DEL MENÚ
 // =============================================
 
-function openModal(modal) {
-    modal.classList.add('active');
-    document.body.style.overflow = 'hidden';
+// Alternar entre login y registro
+if (switchToRegisterMenu) {
+    switchToRegisterMenu.addEventListener('click', () => {
+        loginFormContainer.classList.remove('active');
+        registerFormContainer.classList.add('active');
+    });
 }
 
-function closeModal(modal) {
-    modal.classList.remove('active');
-    document.body.style.overflow = '';
-    if (modal === loginModal) {
-        loginError.textContent = '';
-        loginForm.reset();
-    }
-    if (modal === registerModal) {
-        registerError.textContent = '';
-        registerForm.reset();
-    }
+if (switchToLoginMenu) {
+    switchToLoginMenu.addEventListener('click', () => {
+        registerFormContainer.classList.remove('active');
+        loginFormContainer.classList.add('active');
+    });
 }
 
-document.addEventListener('click', (e) => {
-    if (e.target === loginModal) closeModal(loginModal);
-    if (e.target === registerModal) closeModal(registerModal);
-});
+// Mostrar el gacha y ocultar el menú
+function showGacha() {
+    menuPrincipal.style.display = 'none';
+    gachaApp.style.display = 'block';
+}
 
-document.addEventListener('keydown', (e) => {
-    if (e.key === 'Escape') {
-        closeModal(loginModal);
-        closeModal(registerModal);
-    }
-});
-
-btnLogin.addEventListener('click', () => openModal(loginModal));
-btnRegister.addEventListener('click', () => openModal(registerModal));
-closeLoginModal.addEventListener('click', () => closeModal(loginModal));
-closeRegisterModal.addEventListener('click', () => closeModal(registerModal));
-
-switchToRegister.addEventListener('click', () => {
-    closeModal(loginModal);
-    setTimeout(() => openModal(registerModal), 300);
-});
-
-switchToLogin.addEventListener('click', () => {
-    closeModal(registerModal);
-    setTimeout(() => openModal(loginModal), 300);
-});
+// Mostrar el menú y ocultar el gacha
+function showMenu() {
+    menuPrincipal.style.display = 'block';
+    gachaApp.style.display = 'none';
+}
 
 // =============================================
 // 5. FUNCIONES DE AUTENTICACIÓN
@@ -111,6 +96,158 @@ function generateGuestName() {
     return `Guest-${timestamp}${random}`;
 }
 
+// Login desde el menú
+async function loginFromMenu() {
+    const username = loginUsername.value.trim();
+    const password = loginPassword.value.trim();
+    
+    if (!username || !password) {
+        showMessage('⚠️ Completa todos los campos.');
+        return;
+    }
+    
+    try {
+        // Buscar usuario por nombre
+        const { data: profile, error: profileError } = await supabaseClient
+            .from('profiles')
+            .select('*')
+            .eq('username', username)
+            .maybeSingle();
+        
+        if (profileError || !profile) {
+            showMessage('❌ Usuario no encontrado.');
+            return;
+        }
+        
+        // Intentar login con email (si existe)
+        if (!profile.email) {
+            showMessage('❌ Este usuario no tiene email asociado.');
+            return;
+        }
+        
+        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
+            email: profile.email,
+            password: password
+        });
+        
+        if (authError) {
+            showMessage('❌ Contraseña incorrecta.');
+            return;
+        }
+        
+        currentUser = profile;
+        isGuest = false;
+        updateUI();
+        showMessage(`✅ ¡Bienvenido ${currentUser.username}!`);
+        
+        document.getElementById('authButtons').style.display = 'none';
+        btnLogout.style.display = 'block';
+        userBadge.style.display = 'inline-block';
+        guestBadge.style.display = 'none';
+        
+        await loadCharacters();
+        await rwCommand();
+        showGacha();
+        
+    } catch (error) {
+        console.error('Error en login:', error);
+        showMessage('❌ Error al iniciar sesión.');
+    }
+}
+
+// Registro desde el menú
+async function registerFromMenu() {
+    const username = registerUsername.value.trim();
+    const email = registerEmail.value.trim();
+    const password = registerPassword.value.trim();
+    
+    if (!username || !email || !password) {
+        showMessage('⚠️ Completa todos los campos.');
+        return;
+    }
+    
+    if (password.length < 6) {
+        showMessage('⚠️ La contraseña debe tener al menos 6 caracteres.');
+        return;
+    }
+    
+    try {
+        // Verificar si el usuario ya existe
+        const { data: existingUser } = await supabaseClient
+            .from('profiles')
+            .select('id')
+            .eq('username', username)
+            .maybeSingle();
+        
+        if (existingUser) {
+            showMessage('❌ El nombre de usuario ya está en uso.');
+            return;
+        }
+        
+        // Crear usuario en auth
+        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
+            email: email,
+            password: password,
+            options: {
+                data: {
+                    username: username
+                }
+            }
+        });
+        
+        if (authError) {
+            showMessage('❌ Error al registrar: ' + authError.message);
+            return;
+        }
+        
+        // Crear perfil
+        const { data: profile, error: profileError } = await supabaseClient
+            .from('profiles')
+            .insert({
+                id: authData.user.id,
+                username: username,
+                email: email,
+                coins: 100,
+                is_guest: false
+            })
+            .select()
+            .single();
+        
+        if (profileError) {
+            showMessage('❌ Error al crear perfil.');
+            return;
+        }
+        
+        currentUser = profile;
+        isGuest = false;
+        
+        try {
+            await supabaseClient
+                .from('cooldowns')
+                .insert({ user_id: currentUser.id });
+        } catch (cooldownError) {
+            console.warn('Error al crear cooldown:', cooldownError);
+        }
+        
+        updateUI();
+        showMessage(`✅ ¡Cuenta creada! Bienvenido ${currentUser.username}`);
+        
+        document.getElementById('authButtons').style.display = 'none';
+        btnLogout.style.display = 'block';
+        userBadge.style.display = 'inline-block';
+        guestBadge.style.display = 'none';
+        
+        await loadCharacters();
+        await rwCommand();
+        showGacha();
+        
+    } catch (error) {
+        console.error('Error en registro:', error);
+        showMessage('❌ Error al registrar usuario.');
+    }
+}
+
+// Login como invitado
 async function loginAsGuest() {
     try {
         showMessage('🔄 Creando invitado...');
@@ -155,6 +292,7 @@ async function loginAsGuest() {
         
         await loadCharacters();
         await rwCommand();
+        showGacha();
         
     } catch (error) {
         console.error('Error en login guest:', error);
@@ -162,180 +300,7 @@ async function loginAsGuest() {
     }
 }
 
-async function loginWithEmail(email, password) {
-    try {
-        showMessage('🔄 Iniciando sesión...');
-        
-        const { data: authData, error: authError } = await supabaseClient.auth.signInWithPassword({
-            email: email,
-            password: password
-        });
-        
-        if (authError) throw authError;
-        
-        if (!authData.user) {
-            throw new Error('No se pudo autenticar el usuario');
-        }
-        
-        const { data: profile, error: profileError } = await supabaseClient
-            .from('profiles')
-            .select('*')
-            .eq('id', authData.user.id)
-            .maybeSingle();
-        
-        if (profileError && profileError.code !== 'PGRST116') throw profileError;
-        
-        if (!profile) {
-            const username = email.split('@')[0] + '_' + Math.floor(Math.random() * 1000);
-            const { data: newProfile, error: createError } = await supabaseClient
-                .from('profiles')
-                .insert({
-                    id: authData.user.id,
-                    username: username,
-                    email: email,
-                    coins: 100,
-                    is_guest: false
-                })
-                .select()
-                .single();
-            
-            if (createError) throw createError;
-            currentUser = newProfile;
-        } else {
-            currentUser = profile;
-        }
-        
-        isGuest = false;
-        
-        const { data: cooldownData } = await supabaseClient
-            .from('cooldowns')
-            .select('*')
-            .eq('user_id', currentUser.id)
-            .maybeSingle();
-        
-        if (!cooldownData) {
-            try {
-                await supabaseClient
-                    .from('cooldowns')
-                    .insert({ user_id: currentUser.id });
-            } catch (cooldownError) {
-                console.warn('Error al crear cooldown:', cooldownError);
-            }
-        }
-        
-        updateUI();
-        showMessage(`✅ ¡Bienvenido ${currentUser.username}!`);
-        
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        userBadge.style.display = 'inline-block';
-        guestBadge.style.display = 'none';
-        
-        closeModal(loginModal);
-        loginError.textContent = '';
-        
-        await loadCharacters();
-        await rwCommand();
-        
-    } catch (error) {
-        console.error('Error en login:', error);
-        loginError.textContent = '❌ ' + (error.message || 'Error al iniciar sesión');
-    }
-}
-
-async function registerUser(username, email, password) {
-    try {
-        showMessage('🔄 Registrando usuario...');
-        
-        const { data: existingUser } = await supabaseClient
-            .from('profiles')
-            .select('id')
-            .eq('username', username)
-            .maybeSingle();
-        
-        if (existingUser) {
-            registerError.textContent = '❌ El nombre de usuario ya está en uso';
-            return;
-        }
-        
-        const { data: existingEmail } = await supabaseClient
-            .from('profiles')
-            .select('id')
-            .eq('email', email)
-            .maybeSingle();
-        
-        if (existingEmail) {
-            registerError.textContent = '❌ El correo electrónico ya está registrado';
-            return;
-        }
-        
-        const { data: authData, error: authError } = await supabaseClient.auth.signUp({
-            email: email,
-            password: password,
-            options: {
-                data: {
-                    username: username
-                }
-            }
-        });
-        
-        if (authError) {
-            if (authError.message.includes('already registered')) {
-                registerError.textContent = '❌ Este correo ya está registrado';
-                return;
-            }
-            throw authError;
-        }
-        
-        if (!authData.user) {
-            throw new Error('No se pudo crear el usuario');
-        }
-        
-        const { data: profile, error: profileError } = await supabaseClient
-            .from('profiles')
-            .insert({
-                id: authData.user.id,
-                username: username,
-                email: email,
-                coins: 100,
-                is_guest: false
-            })
-            .select()
-            .single();
-        
-        if (profileError) throw profileError;
-        
-        currentUser = profile;
-        isGuest = false;
-        
-        try {
-            await supabaseClient
-                .from('cooldowns')
-                .insert({ user_id: currentUser.id });
-        } catch (cooldownError) {
-            console.warn('Error al crear cooldown:', cooldownError);
-        }
-        
-        updateUI();
-        showMessage(`✅ ¡Cuenta creada! Bienvenido ${currentUser.username}`);
-        
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        userBadge.style.display = 'inline-block';
-        guestBadge.style.display = 'none';
-        
-        closeModal(registerModal);
-        registerError.textContent = '';
-        
-        await loadCharacters();
-        await rwCommand();
-        
-    } catch (error) {
-        console.error('Error en registro:', error);
-        registerError.textContent = '❌ ' + (error.message || 'Error al registrar usuario');
-    }
-}
-
+// Cerrar sesión
 async function logout() {
     try {
         if (!isGuest) {
@@ -363,6 +328,7 @@ async function logout() {
         btnLogout.style.display = 'none';
         
         showMessage('👋 Sesión cerrada. ¡Vuelve pronto!');
+        showMenu();
         
     } catch (error) {
         console.error('Error en logout:', error);
@@ -713,6 +679,7 @@ async function init() {
                 showMessage(`✅ Bienvenido de nuevo ${currentUser.username}`);
                 await loadCharacters();
                 await rwCommand();
+                showGacha();
                 return;
             }
         }
@@ -720,6 +687,7 @@ async function init() {
         console.log('No hay sesión activa');
     }
     
+    showMenu();
     showMessage('🎮 ¡Bienvenido! Inicia sesión o juega como invitado.');
 }
 
@@ -727,26 +695,29 @@ async function init() {
 // 10. EVENT LISTENERS
 // =============================================
 
+// Menú
+if (btnLoginMenu) btnLoginMenu.addEventListener('click', loginFromMenu);
+if (btnRegisterMenu) btnRegisterMenu.addEventListener('click', registerFromMenu);
+if (btnGuestMenu) btnGuestMenu.addEventListener('click', loginAsGuest);
+
+// Enter para login/registro
+if (loginPassword) {
+    loginPassword.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') loginFromMenu();
+    });
+}
+if (registerPassword) {
+    registerPassword.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter') registerFromMenu();
+    });
+}
+
+// Gacha
 btnRw.addEventListener('click', rwCommand);
 btnClaim.addEventListener('click', claimCommand);
-btnGuest.addEventListener('click', loginAsGuest);
 btnLogout.addEventListener('click', logout);
 
-loginForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const email = document.getElementById('loginEmail').value;
-    const password = document.getElementById('loginPassword').value;
-    loginWithEmail(email, password);
-});
-
-registerForm.addEventListener('submit', (e) => {
-    e.preventDefault();
-    const username = document.getElementById('registerUsername').value;
-    const email = document.getElementById('registerEmail').value;
-    const password = document.getElementById('registerPassword').value;
-    registerUser(username, email, password);
-});
-
+// Tecla I para inventario
 document.addEventListener('keydown', (e) => {
     if (e.key === 'i' || e.key === 'I') {
         showInventory();
