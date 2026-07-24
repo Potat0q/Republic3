@@ -23,15 +23,17 @@
                 <!-- Login -->
                 <div id="loginFormContainer" class="form-container active">
                     <h2>🔑 Iniciar Sesión</h2>
-                    <div class="form-group">
-                        <label>Usuario</label>
-                        <input type="text" id="loginUsername" placeholder="Tu nombre de usuario" />
-                    </div>
-                    <div class="form-group">
-                        <label>Contraseña</label>
-                        <input type="password" id="loginPassword" placeholder="••••••••" />
-                    </div>
-                    <button id="btnLoginMenu" class="btn-primary">ENTRAR</button>
+                    <form id="loginForm" autocomplete="on">
+                        <div class="form-group">
+                            <label>Usuario</label>
+                            <input type="text" id="loginUsername" placeholder="Tu nombre de usuario" autocomplete="username" />
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <input type="password" id="loginPassword" placeholder="••••••••" autocomplete="current-password" />
+                        </div>
+                        <button type="button" id="btnLoginMenu" class="btn-primary">ENTRAR</button>
+                    </form>
                     <p class="form-switch">
                         ¿No tienes cuenta? <span id="switchToRegisterMenu">Regístrate aquí</span>
                     </p>
@@ -40,19 +42,21 @@
                 <!-- Registro -->
                 <div id="registerFormContainer" class="form-container">
                     <h2>📝 Registrarse</h2>
-                    <div class="form-group">
-                        <label>Usuario</label>
-                        <input type="text" id="registerUsername" placeholder="Elige un nombre" />
-                    </div>
-                    <div class="form-group">
-                        <label>Correo</label>
-                        <input type="email" id="registerEmail" placeholder="ejemplo@correo.com" />
-                    </div>
-                    <div class="form-group">
-                        <label>Contraseña</label>
-                        <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" />
-                    </div>
-                    <button id="btnRegisterMenu" class="btn-primary">CREAR CUENTA</button>
+                    <form id="registerForm" autocomplete="on">
+                        <div class="form-group">
+                            <label>Usuario</label>
+                            <input type="text" id="registerUsername" placeholder="Elige un nombre" autocomplete="username" />
+                        </div>
+                        <div class="form-group">
+                            <label>Correo</label>
+                            <input type="email" id="registerEmail" placeholder="ejemplo@correo.com" autocomplete="email" />
+                        </div>
+                        <div class="form-group">
+                            <label>Contraseña</label>
+                            <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" autocomplete="new-password" />
+                        </div>
+                        <button type="button" id="btnRegisterMenu" class="btn-primary">CREAR CUENTA</button>
+                    </form>
                     <p class="form-switch">
                         ¿Ya tienes cuenta? <span id="switchToLoginMenu">Inicia sesión aquí</span>
                     </p>
@@ -90,7 +94,7 @@
                 </div>
                 <div class="user-right">
                     <span class="coins">🪙 <span id="user-coins">0</span></span>
-                    <button class="btn-logout" id="btnLogout">🚪 Salir</button>
+                    <button class="btn-logout" id="btnLogout" style="display:none;">🚪 Salir</button>
                 </div>
             </div>
 
