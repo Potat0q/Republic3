@@ -16,11 +16,11 @@ let lastClaimTime = 0;
 let isGuest = false;
 
 // ⏱️ TIEMPOS DE COOLDOWN (en segundos)
-const COOLDOWN_RW = 3;        // 3 segundos entre #rw
-const COOLDOWN_CLAIM = 30;    // 30 segundos entre #claim
+const COOLDOWN_RW = 3;
+const COOLDOWN_CLAIM = 30;
 
 // =============================================
-// 3. ELEMENTOS DEL DOM
+// 3. ELEMENTOS DEL DOM (CON VERIFICACIONES)
 // =============================================
 const menuPrincipal = document.getElementById('menuPrincipal');
 const gachaApp = document.getElementById('gachaApp');
@@ -56,34 +56,34 @@ const btnLogout = document.getElementById('btnLogout');
 const characterCard = document.getElementById('characterCard');
 
 // =============================================
-// 4. FUNCIONES DEL MENÚ
+// 4. FUNCIONES DEL MENÚ (CON VERIFICACIONES)
 // =============================================
 
 // Alternar entre login y registro
 if (switchToRegisterMenu) {
     switchToRegisterMenu.addEventListener('click', () => {
-        loginFormContainer.classList.remove('active');
-        registerFormContainer.classList.add('active');
+        if (loginFormContainer) loginFormContainer.classList.remove('active');
+        if (registerFormContainer) registerFormContainer.classList.add('active');
     });
 }
 
 if (switchToLoginMenu) {
     switchToLoginMenu.addEventListener('click', () => {
-        registerFormContainer.classList.remove('active');
-        loginFormContainer.classList.add('active');
+        if (registerFormContainer) registerFormContainer.classList.remove('active');
+        if (loginFormContainer) loginFormContainer.classList.add('active');
     });
 }
 
 // Mostrar el gacha y ocultar el menú
 function showGacha() {
-    menuPrincipal.style.display = 'none';
-    gachaApp.style.display = 'block';
+    if (menuPrincipal) menuPrincipal.style.display = 'none';
+    if (gachaApp) gachaApp.style.display = 'block';
 }
 
 // Mostrar el menú y ocultar el gacha
 function showMenu() {
-    menuPrincipal.style.display = 'block';
-    gachaApp.style.display = 'none';
+    if (menuPrincipal) menuPrincipal.style.display = 'block';
+    if (gachaApp) gachaApp.style.display = 'none';
 }
 
 // =============================================
@@ -98,6 +98,11 @@ function generateGuestName() {
 
 // Login desde el menú
 async function loginFromMenu() {
+    if (!loginUsername || !loginPassword) {
+        showMessage('⚠️ Error: elementos del formulario no encontrados.');
+        return;
+    }
+
     const username = loginUsername.value.trim();
     const password = loginPassword.value.trim();
     
@@ -107,7 +112,6 @@ async function loginFromMenu() {
     }
     
     try {
-        // Buscar usuario por nombre
         const { data: profile, error: profileError } = await supabaseClient
             .from('profiles')
             .select('*')
@@ -119,7 +123,6 @@ async function loginFromMenu() {
             return;
         }
         
-        // Intentar login con email (si existe)
         if (!profile.email) {
             showMessage('❌ Este usuario no tiene email asociado.');
             return;
@@ -140,10 +143,9 @@ async function loginFromMenu() {
         updateUI();
         showMessage(`✅ ¡Bienvenido ${currentUser.username}!`);
         
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        userBadge.style.display = 'inline-block';
-        guestBadge.style.display = 'none';
+        if (btnLogout) btnLogout.style.display = 'block';
+        if (userBadge) userBadge.style.display = 'inline-block';
+        if (guestBadge) guestBadge.style.display = 'none';
         
         await loadCharacters();
         await rwCommand();
@@ -157,6 +159,11 @@ async function loginFromMenu() {
 
 // Registro desde el menú
 async function registerFromMenu() {
+    if (!registerUsername || !registerEmail || !registerPassword) {
+        showMessage('⚠️ Error: elementos del formulario no encontrados.');
+        return;
+    }
+
     const username = registerUsername.value.trim();
     const email = registerEmail.value.trim();
     const password = registerPassword.value.trim();
@@ -172,7 +179,6 @@ async function registerFromMenu() {
     }
     
     try {
-        // Verificar si el usuario ya existe
         const { data: existingUser } = await supabaseClient
             .from('profiles')
             .select('id')
@@ -184,7 +190,6 @@ async function registerFromMenu() {
             return;
         }
         
-        // Crear usuario en auth
         const { data: authData, error: authError } = await supabaseClient.auth.signUp({
             email: email,
             password: password,
@@ -200,7 +205,6 @@ async function registerFromMenu() {
             return;
         }
         
-        // Crear perfil
         const { data: profile, error: profileError } = await supabaseClient
             .from('profiles')
             .insert({
@@ -232,10 +236,9 @@ async function registerFromMenu() {
         updateUI();
         showMessage(`✅ ¡Cuenta creada! Bienvenido ${currentUser.username}`);
         
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        userBadge.style.display = 'inline-block';
-        guestBadge.style.display = 'none';
+        if (btnLogout) btnLogout.style.display = 'block';
+        if (userBadge) userBadge.style.display = 'inline-block';
+        if (guestBadge) guestBadge.style.display = 'none';
         
         await loadCharacters();
         await rwCommand();
@@ -285,10 +288,9 @@ async function loginAsGuest() {
         updateUI();
         showMessage(`🎮 ¡Bienvenido ${currentUser.username}! (Invitado)`);
         
-        document.getElementById('authButtons').style.display = 'none';
-        btnLogout.style.display = 'block';
-        guestBadge.style.display = 'inline-block';
-        userBadge.style.display = 'none';
+        if (btnLogout) btnLogout.style.display = 'block';
+        if (guestBadge) guestBadge.style.display = 'inline-block';
+        if (userBadge) userBadge.style.display = 'none';
         
         await loadCharacters();
         await rwCommand();
@@ -312,20 +314,22 @@ async function logout() {
         currentCharacter = null;
         charactersCount = 0;
         
-        displayUsername.textContent = 'Invitado';
-        userCoinsSpan.textContent = '0';
-        charName.textContent = '???';
-        charRarity.textContent = '⭐ Esperando...';
-        charValue.textContent = '🪙 0 monedas';
-        charImage.style.display = 'none';
-        charPlaceholder.style.display = 'flex';
-        btnClaim.disabled = true;
-        characterCard.classList.remove('has-character');
-        userBadge.style.display = 'none';
-        guestBadge.style.display = 'none';
+        if (displayUsername) displayUsername.textContent = 'Invitado';
+        if (userCoinsSpan) userCoinsSpan.textContent = '0';
+        if (charName) charName.textContent = '???';
+        if (charRarity) charRarity.textContent = '⭐ Esperando...';
+        if (charValue) charValue.textContent = '🪙 0 monedas';
+        if (charImage) charImage.style.display = 'none';
+        if (charPlaceholder) {
+            charPlaceholder.style.display = 'flex';
+            charPlaceholder.textContent = '⭐';
+        }
+        if (btnClaim) btnClaim.disabled = true;
+        if (characterCard) characterCard.classList.remove('has-character');
+        if (userBadge) userBadge.style.display = 'none';
+        if (guestBadge) guestBadge.style.display = 'none';
         
-        document.getElementById('authButtons').style.display = 'flex';
-        btnLogout.style.display = 'none';
+        if (btnLogout) btnLogout.style.display = 'none';
         
         showMessage('👋 Sesión cerrada. ¡Vuelve pronto!');
         showMenu();
@@ -416,8 +420,8 @@ async function rwCommand() {
 
         currentCharacter = character;
         displayCharacter(currentCharacter);
-        btnClaim.disabled = false;
-        characterCard.classList.add('has-character');
+        if (btnClaim) btnClaim.disabled = false;
+        if (characterCard) characterCard.classList.add('has-character');
         showMessage('✨ ¡Personaje disponible! Usa #claim para reclamarlo.');
         lastRwTime = now;
 
@@ -473,7 +477,6 @@ async function claimCommand() {
 
         const characterId = currentCharacter.mal_id;
         
-        // Verificar si alguien más ya lo reclamó
         const { data: existingGlobal, error: checkGlobalError } = await supabaseClient
             .from('inventory')
             .select('user_id, profiles!inner(username)')
@@ -491,7 +494,6 @@ async function claimCommand() {
             return;
         }
 
-        // Verificar si el usuario actual ya lo tiene
         const { data: existingUser, error: checkUserError } = await supabaseClient
             .from('inventory')
             .select('id')
@@ -509,7 +511,6 @@ async function claimCommand() {
             return;
         }
 
-        // Insertar en inventario
         const { error: insertError } = await supabaseClient
             .from('inventory')
             .insert({
@@ -523,7 +524,6 @@ async function claimCommand() {
             return;
         }
 
-        // Actualizar monedas
         const newCoins = (currentUser.coins || 0) + coinsToAdd;
         
         const { error: updateError } = await supabaseClient
@@ -570,33 +570,35 @@ function displayCharacter(character) {
     
     const imgUrl = character.image_jpg_url || character.image_webp_url || '';
     
-    if (imgUrl) {
+    if (imgUrl && charImage) {
         charImage.src = imgUrl;
         charImage.style.display = 'block';
-        charPlaceholder.style.display = 'none';
-    } else {
+        if (charPlaceholder) charPlaceholder.style.display = 'none';
+    } else if (charImage) {
         charImage.style.display = 'none';
-        charPlaceholder.style.display = 'flex';
-        charPlaceholder.textContent = '⭐';
+        if (charPlaceholder) {
+            charPlaceholder.style.display = 'flex';
+            charPlaceholder.textContent = '⭐';
+        }
     }
     
-    charName.textContent = character.name || 'Nombre desconocido';
-    charRarity.textContent = `⭐ Rareza: ${character.rarity || 'Común'}`;
-    charValue.textContent = `🪙 Valor: ${character.value || 0} monedas`;
+    if (charName) charName.textContent = character.name || 'Nombre desconocido';
+    if (charRarity) charRarity.textContent = `⭐ Rareza: ${character.rarity || 'Común'}`;
+    if (charValue) charValue.textContent = `🪙 Valor: ${character.value || 0} monedas`;
 }
 
 function updateUI() {
     if (currentUser) {
-        displayUsername.textContent = currentUser.username;
-        userCoinsSpan.textContent = currentUser.coins || 0;
+        if (displayUsername) displayUsername.textContent = currentUser.username;
+        if (userCoinsSpan) userCoinsSpan.textContent = currentUser.coins || 0;
     } else {
-        displayUsername.textContent = 'Invitado';
-        userCoinsSpan.textContent = '0';
+        if (displayUsername) displayUsername.textContent = 'Invitado';
+        if (userCoinsSpan) userCoinsSpan.textContent = '0';
     }
 }
 
 function showMessage(text) {
-    messageP.textContent = text;
+    if (messageP) messageP.textContent = text;
     console.log('📝 Mensaje:', text);
 }
 
@@ -671,10 +673,6 @@ async function init() {
             if (profile) {
                 currentUser = profile;
                 isGuest = false;
-                document.getElementById('authButtons').style.display = 'none';
-                btnLogout.style.display = 'block';
-                userBadge.style.display = 'inline-block';
-                guestBadge.style.display = 'none';
                 updateUI();
                 showMessage(`✅ Bienvenido de nuevo ${currentUser.username}`);
                 await loadCharacters();
@@ -692,15 +690,13 @@ async function init() {
 }
 
 // =============================================
-// 10. EVENT LISTENERS
+// 10. EVENT LISTENERS (CON VERIFICACIONES)
 // =============================================
 
-// Menú
 if (btnLoginMenu) btnLoginMenu.addEventListener('click', loginFromMenu);
 if (btnRegisterMenu) btnRegisterMenu.addEventListener('click', registerFromMenu);
 if (btnGuestMenu) btnGuestMenu.addEventListener('click', loginAsGuest);
 
-// Enter para login/registro
 if (loginPassword) {
     loginPassword.addEventListener('keydown', (e) => {
         if (e.key === 'Enter') loginFromMenu();
@@ -712,12 +708,10 @@ if (registerPassword) {
     });
 }
 
-// Gacha
-btnRw.addEventListener('click', rwCommand);
-btnClaim.addEventListener('click', claimCommand);
-btnLogout.addEventListener('click', logout);
+if (btnRw) btnRw.addEventListener('click', rwCommand);
+if (btnClaim) btnClaim.addEventListener('click', claimCommand);
+if (btnLogout) btnLogout.addEventListener('click', logout);
 
-// Tecla I para inventario
 document.addEventListener('keydown', (e) => {
     if (e.key === 'i' || e.key === 'I') {
         showInventory();
