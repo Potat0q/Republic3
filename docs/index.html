@@ -3,120 +3,126 @@
 <head>
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
-    <title>🎮 Gacha System</title>
+    <title>Republic Momer Games 3</title>
     <link rel="stylesheet" href="style.css" />
 </head>
 <body>
-    <div class="container">
-        <div class="header">
-            <h1>🎮 Gacha System</h1>
-            <p class="subtitle">¡Consigue personajes y colecciónalos!</p>
-        </div>
-
-<div class="user-info" id="userInfo">
-    <div class="user-left">
-        <span class="user-icon">👤</span>
-        <span class="username" id="displayUsername">Invitado</span>
-        <span class="user-badge" id="userBadge" style="display:none;">👑 Registrado</span>
-        <span class="user-badge guest-badge" id="guestBadge" style="display:none;">🎮 Invitado</span>
-        <!-- 👇 AGREGA ESTE BOTÓN AQUÍ -->
-        <button id="btnAdmin" style="display: none;">👑 Admin</button>
-    </div>
-    <div class="user-right">
-        <span class="coins">🪙 <span id="user-coins">0</span></span>
-        <button class="btn-logout" id="btnLogout" style="display:none;">🚪 Salir</button>
-    </div>
-</div>
-
-        <!-- Personaje -->
-        <div class="character-card" id="characterCard">
-            <div class="character-image-container">
-                <img id="char-image" src="" alt="Personaje" style="display:none;" />
-                <div class="character-placeholder" id="charPlaceholder">❓</div>
+    <!-- ============================================= -->
+    <!-- 1. MENÚ DE INICIO -->
+    <!-- ============================================= -->
+    <div id="menuPrincipal">
+        <div class="menu-container">
+            <!-- Título -->
+            <div class="menu-header">
+                <h1 class="menu-title">REPUBLIC MOMER GAMES 3</h1>
+                <p class="menu-subtitle">🎮 El regreso</p>
             </div>
-            <div class="character-info">
-                <div class="char-name" id="char-name">???</div>
-                <div class="char-rarity" id="char-rarity">⭐ Esperando...</div>
-                <div class="char-value" id="char-value">🪙 0 monedas</div>
-            </div>
-        </div>
 
-        <!-- Botones de acción -->
-        <div class="buttons">
-            <button class="btn-rw" id="btn-rw">🎲 #rw</button>
-            <button class="btn-claim" id="btn-claim" disabled>📥 #claim</button>
-        </div>
-
-        <!-- Mensaje -->
-        <div class="message" id="message">🎮 ¡Bienvenido! Inicia sesión o juega como invitado.</div>
-
-        <!-- Botones de autenticación -->
-        <div class="auth-buttons" id="authButtons">
-            <button class="btn-guest" id="btnGuest">🎮 Invitado</button>
-            <button class="btn-login" id="btnLogin">🔑 Iniciar Sesión</button>
-            <button class="btn-register" id="btnRegister">📝 Registrarse</button>
-        </div>
-
-        <div class="footer">
-            <span class="footer-hint">💡 Presiona <kbd>I</kbd> para ver tu inventario</span>
-        </div>
-    </div>
-
-    <!-- MODAL LOGIN -->
-    <div class="modal-overlay" id="loginModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>🔑 Iniciar Sesión</h2>
-                <button class="modal-close-btn" id="closeLoginModal">✕</button>
-            </div>
-            <form id="loginForm" autocomplete="on">
-                <div class="form-group">
-                    <label>Correo electrónico</label>
-                    <input type="email" id="loginEmail" placeholder="ejemplo@correo.com" required autocomplete="email" />
+            <!-- Contenedor de formularios -->
+            <div class="menu-forms" id="formContainer">
+                <!-- Login -->
+                <div id="loginFormContainer" class="form-container active">
+                    <h2>🔑 Iniciar Sesión</h2>
+                    <div class="form-group">
+                        <label>Usuario</label>
+                        <input type="text" id="loginUsername" placeholder="Tu nombre de usuario" />
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="loginPassword" placeholder="••••••••" />
+                    </div>
+                    <button id="btnLoginMenu" class="btn-primary">ENTRAR</button>
+                    <p class="form-switch">
+                        ¿No tienes cuenta? <span id="switchToRegisterMenu">Regístrate aquí</span>
+                    </p>
                 </div>
-                <div class="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" id="loginPassword" placeholder="••••••••" required autocomplete="current-password" />
+
+                <!-- Registro -->
+                <div id="registerFormContainer" class="form-container">
+                    <h2>📝 Registrarse</h2>
+                    <div class="form-group">
+                        <label>Usuario</label>
+                        <input type="text" id="registerUsername" placeholder="Elige un nombre" />
+                    </div>
+                    <div class="form-group">
+                        <label>Correo</label>
+                        <input type="email" id="registerEmail" placeholder="ejemplo@correo.com" />
+                    </div>
+                    <div class="form-group">
+                        <label>Contraseña</label>
+                        <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" />
+                    </div>
+                    <button id="btnRegisterMenu" class="btn-primary">CREAR CUENTA</button>
+                    <p class="form-switch">
+                        ¿Ya tienes cuenta? <span id="switchToLoginMenu">Inicia sesión aquí</span>
+                    </p>
                 </div>
-                <button type="submit" class="btn-submit">Iniciar Sesión</button>
-            </form>
-            <div class="modal-switch">
-                ¿No tienes cuenta? <a id="switchToRegister">Regístrate aquí</a>
             </div>
-            <div id="loginError" class="error-message"></div>
+
+            <!-- Separador -->
+            <div class="menu-divider">
+                <span>o</span>
+            </div>
+
+            <!-- Botón Guest -->
+            <button id="btnGuestMenu" class="btn-guest">🎮 JUGAR COMO INVITADO</button>
+            <p class="guest-warning">⚠️ Los datos de invitado no se guardarán al cerrar sesión</p>
         </div>
     </div>
 
-    <!-- MODAL REGISTER -->
-    <div class="modal-overlay" id="registerModal">
-        <div class="modal-content">
-            <div class="modal-header">
-                <h2>📝 Registrarse</h2>
-                <button class="modal-close-btn" id="closeRegisterModal">✕</button>
+    <!-- ============================================= -->
+    <!-- 2. GACHA (OCULTO HASTA QUE INICIE SESIÓN) -->
+    <!-- ============================================= -->
+    <div id="gachaApp" style="display: none;">
+        <div class="container">
+            <div class="header">
+                <h1>🎮 Gacha System</h1>
+                <p class="subtitle">¡Consigue personajes y colecciónalos!</p>
             </div>
-            <form id="registerForm" autocomplete="on">
-                <div class="form-group">
-                    <label>Nombre de usuario</label>
-                    <input type="text" id="registerUsername" placeholder="Tu nombre" required autocomplete="username" />
+
+            <!-- Info de usuario -->
+            <div class="user-info" id="userInfo">
+                <div class="user-left">
+                    <span class="user-icon">👤</span>
+                    <span class="username" id="displayUsername">Invitado</span>
+                    <span class="user-badge" id="userBadge" style="display:none;">👑 Registrado</span>
+                    <span class="user-badge guest-badge" id="guestBadge" style="display:none;">🎮 Invitado</span>
                 </div>
-                <div class="form-group">
-                    <label>Correo electrónico</label>
-                    <input type="email" id="registerEmail" placeholder="ejemplo@correo.com" required autocomplete="email" />
+                <div class="user-right">
+                    <span class="coins">🪙 <span id="user-coins">0</span></span>
+                    <button class="btn-logout" id="btnLogout">🚪 Salir</button>
                 </div>
-                <div class="form-group">
-                    <label>Contraseña</label>
-                    <input type="password" id="registerPassword" placeholder="Mínimo 6 caracteres" required autocomplete="new-password" minlength="6" />
-                </div>
-                <button type="submit" class="btn-submit">Registrarse</button>
-            </form>
-            <div class="modal-switch">
-                ¿Ya tienes cuenta? <a id="switchToLogin">Inicia sesión aquí</a>
             </div>
-            <div id="registerError" class="error-message"></div>
+
+            <!-- Personaje -->
+            <div class="character-card" id="characterCard">
+                <div class="character-image-container">
+                    <img id="char-image" src="" alt="Personaje" style="display:none;" />
+                    <div class="character-placeholder" id="charPlaceholder">❓</div>
+                </div>
+                <div class="character-info">
+                    <div class="char-name" id="char-name">???</div>
+                    <div class="char-rarity" id="char-rarity">⭐ Esperando...</div>
+                    <div class="char-value" id="char-value">🪙 0 monedas</div>
+                </div>
+            </div>
+
+            <!-- Botones de acción -->
+            <div class="buttons">
+                <button class="btn-rw" id="btn-rw">🎲 #rw</button>
+                <button class="btn-claim" id="btn-claim" disabled>📥 #claim</button>
+            </div>
+
+            <!-- Mensaje -->
+            <div class="message" id="message">🎮 ¡Bienvenido! Inicia sesión o juega como invitado.</div>
+
+            <div class="footer">
+                <span class="footer-hint">💡 Presiona <kbd>I</kbd> para ver tu inventario</span>
+            </div>
         </div>
     </div>
 
-    <script src="https://unpkg.com/@supabase/supabase-js@2"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
     <script src="script.js"></script>
 </body>
 </html>
